@@ -1,0 +1,132 @@
+// PathPilot - Personalized Learning Path Planner
+// Senior Backend & Database Architecture Schema for Neon DB (PostgreSQL)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// =========================================================================
+// USER MODEL
+// =========================================================================
+
+model User {
+  id               String            @id @default(uuid())
+  email            String            @unique
+  name             String?
+  weeklyStudyHours Int               @default(10) // Supports time-constrained planning
+  targetGoalId     String?
+  createdAt        DateTime          @default(now())
+
+  targetGoal       Goal?             @relation(fields: [targetGoalId], references: [id], onDelete: SetNull)
+  progress         StudentProgress[]
+
+  @@map("users")
+}
+
+// =========================================================================
+// GRAPH NODE MODEL: COURSE
+// =========================================================================
+
+model Course {
+  id             String            @id @default(uuid())
+  code           String            @unique // e.g. "CS101", "MATH201" for graph node labeling
+  title          String
+  description    String            @db.Text
+  estimatedHours Int               // Effort required for time-constrained roadmap calculation
+  category       String            @default("General") // "Mathematics", "Core CS", "AI/ML", etc.
+  createdAt      DateTime          @default(now())
+
+  // Self-referencing many-to-many relationship for DAG edges:
+  // 1. prerequisites: courses that must be completed BEFORE this course (In-Edges / Parents)
+  prerequisites  Prerequisite[]    @relation("CourseAsCourse")
+
+  // 2. requiredFor: courses that this course unlocks (Out-Edges / Downstream Children)
+  requiredFor    Prerequisite[]    @relation("CourseAsPrerequisite")
+
+  students       StudentProgress[]
+  goals          GoalCourse[]
+
+  @@index([code])
+  @@map("courses")
+}
+
+// =========================================================================
+// GRAPH EDGE TABLE: PREREQUISITE (Directed Edge in DAG)
+// =========================================================================
+
+// Directed Edge representing prerequisite dependency:
+// prerequisiteCourseId (Parent Node)  --->  courseId (Child Node)
+//
+// Query optimization:
+// - Forward Graph (What does course X unlock?): Query where prerequisiteCourseId = X
+// - Backward Graph (What does course Y require?): Query where courseId = Y
+// - In-degree of course Y: count of records where courseId = Y
+model Prerequisite {
+  courseId             String
+  prerequisiteCourseId String
+
+  course               Course   @relation("CourseAsCourse", fields: [courseId], references: [id], onDelete: Cascade)
+  prerequisiteCourse   Course   @relation("CourseAsPrerequisite", fields: [prerequisiteCourseId], references: [id], onDelete: Cascade)
+
+  @@id([courseId, prerequisiteCourseId])
+  @@index([courseId])
+  @@index([prerequisiteCourseId])
+  @@map("prerequisites")
+}
+
+// =========================================================================
+// STUDENT PROGRESS (Knowledge-Aware Roadmaps)
+// =========================================================================
+
+model StudentProgress {
+  id          String   @id @default(uuid())
+  userId      String
+  courseId    String
+  isCompleted Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@index([courseId])
+  @@map("student_progress")
+}
+
+// =========================================================================
+// GOAL-BASED SUBGRAPH EXTRACTION
+// =========================================================================
+
+model Goal {
+  id          String       @id @default(uuid())
+  name        String       @unique // e.g. "Machine Learning Engineer", "DSA Interview Preparation"
+  slug        String       @unique
+  description String?      @db.Text
+  createdAt   DateTime     @default(now())
+
+  users       User[]
+  courses     GoalCourse[]
+
+  @@map("goals")
+}
+
+model GoalCourse {
+  goalId     String
+  courseId   String
+  isTerminal Boolean  @default(false) // Target capstone node for reverse BFS/DFS subgraph isolation
+
+  goal       Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@id([goalId, courseId])
+  @@index([goalId])
+  @@index([courseId])
+  @@map("goal_courses")
+}
