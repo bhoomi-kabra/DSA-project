@@ -1,0 +1,235 @@
+/* =========================================================
+   PathPilot — Global Styles  (v2 — refined dark SaaS theme)
+   ========================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+/* ─── Design Tokens ─────────────────────────────────────── */
+:root {
+  /* Backgrounds */
+  --bg-base:       #0B1020;
+  --bg-sidebar:    #0E1425;
+  --bg-card:       #141C30;
+  --bg-elevated:   #19233A;
+  --bg-input:      #121929;
+
+  /* Accents */
+  --accent:        #8B7CFF;   /* primary purple */
+  --accent-dim:    rgba(139,124,255,0.14);
+  --accent-border: rgba(139,124,255,0.28);
+  --accent-2:      #59B8FF;   /* secondary sky blue */
+  --accent-2-dim:  rgba(89,184,255,0.12);
+  --accent-green:  #52D9A4;
+  --accent-green-dim: rgba(82,217,164,0.12);
+
+  /* Text */
+  --text-primary:  #F4F6FF;
+  --text-secondary:#929DB5;
+  --text-muted:    #55617A;
+
+  /* Borders */
+  --border:        rgba(255,255,255,0.07);
+  --border-active: rgba(139,124,255,0.4);
+
+  /* Misc */
+  --success:       #52D9A4;
+  --warn:          #F5A623;
+  --danger:        #F06292;
+
+  --sidebar-w:     240px;
+  --topbar-h:      60px;
+  --radius:        10px;
+  --radius-lg:     14px;
+  --radius-xl:     18px;
+
+  --ease:          cubic-bezier(0.25,0.46,0.45,0.94);
+  --t-fast:        0.15s;
+  --t-med:         0.22s;
+}
+
+/* ─── Reset ─────────────────────────────────────────────── */
+*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+#root { min-height: 100vh; }
+
+/* ─── Scrollbar ──────────────────────────────────────────── */
+::-webkit-scrollbar        { width: 5px; height: 5px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: rgba(139,124,255,0.35); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+/* ─── Typography ─────────────────────────────────────────── */
+h1,h2,h3,h4,h5,h6 {
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { color: var(--accent-2); }
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  outline: none;
+  background: none;
+}
+
+input, textarea {
+  font-family: inherit;
+  outline: none;
+  border: none;
+}
+
+/* ─── Utilities ──────────────────────────────────────────── */
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0,0,0,0); border: 0;
+}
+
+/* text accent gradients */
+.text-accent  { color: var(--accent); }
+.text-accent2 { color: var(--accent-2); }
+.text-muted   { color: var(--text-secondary); }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+.pill-purple { background: var(--accent-dim);       color: var(--accent);       border: 1px solid var(--accent-border); }
+.pill-blue   { background: var(--accent-2-dim);     color: var(--accent-2);     border: 1px solid rgba(89,184,255,0.25); }
+.pill-green  { background: var(--accent-green-dim); color: var(--accent-green); border: 1px solid rgba(82,217,164,0.25); }
+
+/* ─── Animations ─────────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes nodePulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(139,124,255,0.4); }
+  50%     { box-shadow: 0 0 0 6px rgba(139,124,255,0); }
+}
+@keyframes rotateSlow {
+  to { transform: rotate(360deg); }
+}
+@keyframes dashDraw {
+  to { stroke-dashoffset: 0; }
+}
+
+.anim-fade-up { animation: fadeUp 0.42s var(--ease) both; }
+.anim-fade-in { animation: fadeIn 0.3s var(--ease) both; }
+
+/* stagger utility — apply to parent, children get delays */
+.stagger > *:nth-child(1)  { animation-delay: 0.04s; }
+.stagger > *:nth-child(2)  { animation-delay: 0.09s; }
+.stagger > *:nth-child(3)  { animation-delay: 0.14s; }
+.stagger > *:nth-child(4)  { animation-delay: 0.19s; }
+.stagger > *:nth-child(5)  { animation-delay: 0.24s; }
+.stagger > *:nth-child(6)  { animation-delay: 0.29s; }
+
+/* ─── Shared card base ───────────────────────────────────── */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.card-elevated {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+/* ─── Buttons ────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1;
+  transition: all var(--t-fast) var(--ease);
+  white-space: nowrap;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 4px 18px rgba(139,124,255,0.28);
+}
+.btn-primary:hover {
+  background: #9d90ff;
+  box-shadow: 0 6px 22px rgba(139,124,255,0.42);
+  transform: translateY(-1px);
+}
+.btn-primary:active  { transform: translateY(0); }
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+.btn-ghost:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: rgba(255,255,255,0.12);
+}
+
+.btn-outline-accent {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid var(--accent-border);
+}
+.btn-outline-accent:hover {
+  background: rgba(139,124,255,0.22);
+}
+
+.icon-btn {
+  width: 34px; height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  transition: all var(--t-fast);
+  flex-shrink: 0;
+}
+.icon-btn:hover {
+  color: var(--text-primary);
+  border-color: rgba(255,255,255,0.12);
+}
