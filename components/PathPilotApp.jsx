@@ -1,5 +1,7 @@
+'use client';
+
 /**
- * App.jsx — PathPilot v2
+ * PathPilotApp.jsx — PathPilot Full-Stack App
  * Personalised Learning Path Planner
  *
  * Views:
@@ -8,26 +10,25 @@
  *   courses   → Course library with search (My Courses)
  *   progress  → Detailed per-goal progress (My Progress)
  */
-import { useState, useCallback } from 'react';
-import './App.css';
+import { useState, useCallback, useEffect } from 'react';
 
 // Layout
-import Sidebar from './components/Sidebar';
+import Sidebar from './Sidebar';
 
 // Authentication
-import AuthPage from './AuthPage.jsx';
+import AuthPage from './AuthPage';
 
 // Views
-import GoalCard        from './components/GoalCard';
-import HeroGraph       from './components/HeroGraph';
-import ProgressSection from './components/ProgressSection';
-import RoadmapView     from './components/RoadmapView';
-import RoadmapPageView from './components/RoadmapPageView';
-import CoursesView     from './components/CoursesView';
-import ProgressView    from './components/ProgressView';
+import GoalCard from './GoalCard';
+import HeroGraph from './HeroGraph';
+import ProgressSection from './ProgressSection';
+import RoadmapView from './RoadmapView';
+import RoadmapPageView from './RoadmapPageView';
+import CoursesView from './CoursesView';
+import ProgressView from './ProgressView';
 
 // Data
-import { GOALS, COURSES, PROGRESS } from './data/courseData';
+import { GOALS, COURSES, PROGRESS } from '../data/courseData';
 
 // Icons
 import {
@@ -82,62 +83,61 @@ const STAT_TILES = [
 // ─── Page label map ─────────────────────────────────────────
 const PAGE_LABELS = {
   overview: 'Overview',
-  roadmap:  'My Roadmap',
-  courses:  'My Courses',
+  roadmap: 'My Roadmap',
+  courses: 'My Courses',
   progress: 'My Progress',
 };
 
-// ─── App ────────────────────────────────────────────────────
-export default function App() {
+export default function PathPilotApp() {
   const [activeNav, setActiveNav] = useState('overview');
   const [selectedGoal, setSelectedGoal] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  const [isAuthenticated, setIsAuthenticated] = useState(
-    () => sessionStorage.getItem('pathpilot_demo_authenticated') === 'true'
-  );
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    if (typeof window !== 'undefined') {
+      setIsAuthenticated(sessionStorage.getItem('pathpilot_demo_authenticated') === 'true');
+    }
+  }, []);
 
   // Shared state for course completion and progress
   const [courses, setCourses] = useState(COURSES);
-  // Update the status of a course
-const handleCourseStatusChange = useCallback((courseId, newStatus) => {
-  setCourses((previousCourses) =>
-    previousCourses.map((course) =>
-      course.id === courseId
-        ? { ...course, status: newStatus }
-        : course
-    )
-  );
-}, []);
-  // Keep your existing callbacks below, including:
-  // handleAuthenticated
-  // handleLogout
-  // handleGoalClick
-  // handleBuildRoadmap
-  // navigate
-  // handleSearch
-  // handleNav
 
-const handleAuthenticated = useCallback(() => {
-  sessionStorage.setItem('pathpilot_demo_authenticated', 'true');
-  setIsAuthenticated(true);
-}, []);
-const handleLogout = useCallback(() => {
-  sessionStorage.removeItem('pathpilot_demo_authenticated');
+  const handleCourseStatusChange = useCallback((courseId, newStatus) => {
+    setCourses((previousCourses) =>
+      previousCourses.map((course) =>
+        course.id === courseId ? { ...course, status: newStatus } : course
+      )
+    );
+  }, []);
 
-  setIsAuthenticated(false);
-  setActiveNav('overview');
-  setSelectedGoal(null);
-  setSearchQuery('');
-  setSidebarOpen(false);
-}, []);
+  const handleAuthenticated = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('pathpilot_demo_authenticated', 'true');
+    }
+    setIsAuthenticated(true);
+  }, []);
 
-  const currentGoal = GOALS.find(g => g.id === selectedGoal) ?? null;
+  const handleLogout = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('pathpilot_demo_authenticated');
+    }
+    setIsAuthenticated(false);
+    setActiveNav('overview');
+    setSelectedGoal(null);
+    setSearchQuery('');
+    setSidebarOpen(false);
+  }, []);
+
+  const currentGoal = GOALS.find((g) => g.id === selectedGoal) ?? null;
 
   // Toggle goal selection (click same = deselect)
   const handleGoalClick = useCallback((id) => {
-    setSelectedGoal(prev => (prev === id ? null : id));
+    setSelectedGoal((prev) => (prev === id ? null : id));
   }, []);
 
   // "Build My Roadmap" CTA — navigate to roadmap view with current goal
@@ -152,38 +152,47 @@ const handleLogout = useCallback(() => {
   }, []);
 
   // Search: if on courses view, filter there; otherwise jump to courses
-  const handleSearch = useCallback((e) => {
-    const val = e.target.value;
-    setSearchQuery(val);
-    if (val.trim() && activeNav !== 'courses') {
-      setActiveNav('courses');
-    }
-  }, [activeNav]);
+  const handleSearch = useCallback(
+    (e) => {
+      const val = e.target.value;
+      setSearchQuery(val);
+      if (val.trim() && activeNav !== 'courses') {
+        setActiveNav('courses');
+      }
+    },
+    [activeNav]
+  );
 
   // Clear search when leaving courses view
-  const handleNav = useCallback((view) => {
-    if (view !== 'courses') setSearchQuery('');
-    navigate(view);
-  }, [navigate]);
+  const handleNav = useCallback(
+    (view) => {
+      if (view !== 'courses') setSearchQuery('');
+      navigate(view);
+    },
+    [navigate]
+  );
+
+  if (!mounted) {
+    return null;
+  }
 
   if (!isAuthenticated) {
-  return <AuthPage onAuthenticated={handleAuthenticated} />;
-}
+    return <AuthPage onAuthenticated={handleAuthenticated} />;
+  }
 
   return (
     <div className="app-shell">
       {/* ── Sidebar ─────────────────────────────────────── */}
       <Sidebar
-  activeNav={activeNav}
-  onNavChange={handleNav}
-  isOpen={sidebarOpen}
-  onClose={() => setSidebarOpen(false)}
-  onLogout={handleLogout}
-/>
+        activeNav={activeNav}
+        onNavChange={handleNav}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        onLogout={handleLogout}
+      />
 
       {/* ── Main ────────────────────────────────────────── */}
       <main className="main">
-
         {/* Top Bar */}
         <header className="topbar">
           <div className="topbar-left">
@@ -192,7 +201,7 @@ const handleLogout = useCallback(() => {
               className="icon-btn menu-btn"
               id="btn-menu"
               aria-label="Open navigation"
-              onClick={() => setSidebarOpen(prev => !prev)}
+              onClick={() => setSidebarOpen((prev) => !prev)}
             >
               {sidebarOpen ? <X size={17} /> : <Menu size={17} />}
             </button>
@@ -231,11 +240,9 @@ const handleLogout = useCallback(() => {
 
         {/* ── Page content ──────────────────────────────── */}
         <div className="page-wrap">
-
           {/* ══ OVERVIEW ══════════════════════════════════ */}
           {activeNav === 'overview' && (
             <div className="anim-fade-in">
-
               {/* Hero */}
               <section className="hero" aria-labelledby="hero-heading">
                 <div className="hero-content">
@@ -277,7 +284,7 @@ const handleLogout = useCallback(() => {
                 role="list"
                 aria-label="Learning statistics"
               >
-                {STAT_TILES.map(s => (
+                {STAT_TILES.map((s) => (
                   <div
                     key={s.id}
                     id={s.id}
@@ -310,7 +317,7 @@ const handleLogout = useCallback(() => {
                   </button>
                 </div>
                 <div className="goals-grid stagger">
-                  {GOALS.map(goal => (
+                  {GOALS.map((goal) => (
                     <GoalCard
                       key={goal.id}
                       goal={goal}
@@ -332,8 +339,11 @@ const handleLogout = useCallback(() => {
                     {currentGoal && (
                       <span
                         className={`pill ${
-                          currentGoal.bgToken === 'purple' ? 'pill-purple' :
-                          currentGoal.bgToken === 'blue'   ? 'pill-blue'   : 'pill-green'
+                          currentGoal.bgToken === 'purple'
+                            ? 'pill-purple'
+                            : currentGoal.bgToken === 'blue'
+                            ? 'pill-blue'
+                            : 'pill-green'
                         }`}
                         style={{ marginLeft: 10 }}
                       >
@@ -380,7 +390,6 @@ const handleLogout = useCallback(() => {
                   </div>
                 </div>
               </section>
-
             </div>
           )}
 
@@ -394,19 +403,17 @@ const handleLogout = useCallback(() => {
 
           {/* ══ MY COURSES ════════════════════════════════ */}
           {activeNav === 'courses' && (
-  <CoursesView
-    searchQuery={searchQuery}
-    courses={courses}
-    onCourseStatusChange={handleCourseStatusChange}
-  />
-)}
+            <CoursesView
+              searchQuery={searchQuery}
+              courses={courses}
+              onCourseStatusChange={handleCourseStatusChange}
+            />
+          )}
 
           {/* ══ MY PROGRESS ══════════════════════════════ */}
-         {activeNav === 'progress' && (
-  <ProgressView courses={courses} />
-)}
-
-        </div>{/* /page-wrap */}
+          {activeNav === 'progress' && <ProgressView courses={courses} />}
+        </div>
+        {/* /page-wrap */}
       </main>
     </div>
   );

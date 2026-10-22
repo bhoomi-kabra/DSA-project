@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * ProgressSection.jsx — Learning Overview panel (sample data).
  *

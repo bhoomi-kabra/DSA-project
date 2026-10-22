@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * CoursesView.jsx — "My Courses" full-page view.
  *

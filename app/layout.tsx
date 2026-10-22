@@ -1,8 +1,15 @@
 import type { Metadata } from "next";
+import "@/styles/globals.css";
+import "@/styles/App.css";
+import "@/styles/AuthPage.css";
+import "@xyflow/react/dist/style.css";
 
 export const metadata: Metadata = {
-  title: "PathPilot | Backend API & Database Gateway",
-  description: "Personalized Learning Path Planner - Graph Backend Service",
+  title: "PathPilot — Personalised Learning Path Planner",
+  description: "Build a learning path that matches your goals, one prerequisite at a time.",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
@@ -12,9 +19,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body style={{ margin: 0, padding: 0, backgroundColor: "#ffffff", color: "#111827", fontFamily: "system-ui, -apple-system, sans-serif" }}>
+      <body>
         {children}
       </body>
     </html>
   );
 }
+

@@ -1,3 +1,5 @@
+'use client';
+
 // Sidebar.jsx — PathPilot v2
 import {
   LayoutDashboard,

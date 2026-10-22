@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * ProgressView.jsx — "My Progress" full-page view.
  *

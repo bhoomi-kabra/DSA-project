@@ -1,4 +1,6 @@
 
+'use client';
+
 import { useState } from 'react';
 import {
   ArrowRight,
@@ -14,8 +16,6 @@ import {
   Sparkles,
   UserRound,
 } from 'lucide-react';
-
-import './AuthPage.css';
 
 export default function AuthPage({ onAuthenticated }) {
   const [mode, setMode] = useState('login');

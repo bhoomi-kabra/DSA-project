@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * RoadmapPageView.jsx — "My Roadmap" full-page view.
  *

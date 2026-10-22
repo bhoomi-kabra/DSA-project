@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * RoadmapView.jsx
  *
@@ -18,7 +20,6 @@ import {
   addEdge,
   MarkerType,
 } from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
 import { GitBranch } from 'lucide-react';
 import { SAMPLE_GRAPHS } from '../data/courseData';
 

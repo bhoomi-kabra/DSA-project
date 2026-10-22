@@ -1,3 +1,5 @@
+'use client';
+
 // GoalCard.jsx — v2
 import { Brain, Code2, Trophy, Check } from 'lucide-react';
 
