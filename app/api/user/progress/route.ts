@@ -44,25 +44,56 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId, courseId, isCompleted } = body;
+    let { userId, courseId, isCompleted } = body;
 
-    if (!userId || !courseId || typeof isCompleted !== "boolean") {
+    if (!courseId || typeof isCompleted !== "boolean") {
       return NextResponse.json(
-        { error: "Missing required fields: userId, courseId, isCompleted (boolean)" },
+        { error: "Missing required fields: courseId, isCompleted (boolean)" },
         { status: 400 }
       );
     }
+
+    // Default to first user if userId not provided
+    if (!userId) {
+      const defaultUser = await prisma.user.findFirst();
+      if (!defaultUser) {
+        return NextResponse.json(
+          { error: "No users found in database." },
+          { status: 404 }
+        );
+      }
+      userId = defaultUser.id;
+    }
+
+    // Allow courseId to be either a UUID or a course code (e.g., CS101)
+    const matchedCourse = await prisma.course.findFirst({
+      where: {
+        OR: [
+          { id: courseId },
+          { code: courseId }
+        ]
+      }
+    });
+
+    if (!matchedCourse) {
+      return NextResponse.json(
+        { error: `Course not found for identifier: ${courseId}` },
+        { status: 404 }
+      );
+    }
+
+    const targetCourseId = matchedCourse.id;
 
     const updated = await prisma.studentProgress.upsert({
       where: {
         userId_courseId: {
           userId,
-          courseId,
+          courseId: targetCourseId,
         },
       },
       create: {
         userId,
-        courseId,
+        courseId: targetCourseId,
         isCompleted,
       },
       update: {

@@ -87,10 +87,27 @@ model StudentProgress {
 - `GET /api/health` — Neon DB connection status and entity counts.
 - `GET /api/graph` — Complete course DAG (nodes, edges, forward & reverse adjacency lists).
 - `GET /api/graph?goal=machine-learning-engineer` — Goal-specific prerequisite subgraph extraction.
-- `GET /api/graph?format=cpp` — Standard 0-indexed edge list $(u, v)$ for direct consumption by the C++ graph engine.
+- `GET /api/graph?format=cpp` — Standard 0-indexed edge list $(u, v)$ for C++ engine consumption.
+- `GET /api/graph?engine=cpp&goal=...` — Direct execution of C++ Graph Algorithm Engine via GET query.
+- `POST /api/graph/analyze` — Primary C++ graph engine execution endpoint. Accepts `{ goal, userId, operation, weeklyStudyHours }`. Returns topological learning order, cycle diagnostics, critical path, study-time estimates, and React Flow nodes/edges.
+- `POST /api/graph` — Same as `/api/graph/analyze`.
 - `GET /api/goals` — List of career goals and target milestone capstones.
 - `GET /api/user/progress?userId=...` — Knowledge-aware roadmap state (completed, unlocked, locked, remaining hours).
 - `POST /api/user/progress` — Body: `{ userId, courseId, isCompleted }`. Recalculates unlocked courses.
+
+---
+
+## C++ Graph Algorithm Engine
+
+PathPilot includes a high-performance native C++ engine (`cpp/`) that executes graph algorithms over real database data:
+
+1. **Algorithm A (Graph Construction)**: Validates indices, builds forward & reverse adjacency lists and in-degrees, rejects self-loops and duplicate edges.
+2. **Algorithm B (Reverse BFS Subgraph Extraction)**: Discovers prerequisite ancestors from target capstone courses.
+3. **Algorithm C (Topological Sorting)**: Implements Kahn's algorithm with deterministic tie-breaking using a min-priority queue ordered by course code.
+4. **Algorithm D (Cycle Detection & Isolation)**: Detects cyclic dependencies using Kahn's algorithm and isolates cyclic nodes from blocked downstream nodes via DFS.
+5. **Algorithm E (Critical-Path Study-Time Estimation)**: Computes the longest prerequisite chain using dynamic programming along the topological order. Distinguishes total cumulative workload ($\sum h$) from critical-path duration ($\max_{\text{paths}} \sum h$).
+
+See [cpp/README.md](file:///c:/Users/Lenovo/OneDrive/Desktop/Path-Pilot/DSA-project/cpp/README.md) for detailed complexity analysis and architectural documentation.
 
 ---
 
@@ -116,6 +133,15 @@ npx prisma db push
 # 5. Seed initial courses, edges, goals, and demo student
 npm run prisma:seed
 
-# 6. Start development server
+# 6. Compile C++ Graph Engine and Test Suite
+npm run cpp:build
+
+# 7. Run C++ Unit Tests (10 test cases)
+npm run cpp:test
+
+# 8. Run Full-Stack Integration Tests
+npm run test:integration
+
+# 9. Start Next.js development server
 npm run dev
 ```

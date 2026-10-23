@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "@/styles/globals.css";
 import "@/styles/App.css";
 import "@/styles/AuthPage.css";
+import "@/styles/Roadmap.css";
 import "@xyflow/react/dist/style.css";
 
 export const metadata: Metadata = {

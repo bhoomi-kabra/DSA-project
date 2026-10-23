@@ -1,0 +1,61 @@
+{
+  "operation": "analyze",
+  "weeklyStudyHours": 15,
+  "vertices": [
+    {
+      "index": 0,
+      "id": "c-cs101",
+      "code": "CS101",
+      "title": "Programming Fundamentals with Python",
+      "estimatedHours": 25,
+      "category": "Core CS"
+    },
+    {
+      "index": 1,
+      "id": "c-math201",
+      "code": "MATH201",
+      "title": "Linear Algebra & Matrix Methods",
+      "estimatedHours": 30,
+      "category": "Mathematics"
+    },
+    {
+      "index": 2,
+      "id": "c-math202",
+      "code": "MATH202",
+      "title": "Probability & Applied Statistics",
+      "estimatedHours": 25,
+      "category": "Mathematics"
+    },
+    {
+      "index": 3,
+      "id": "c-cs201",
+      "code": "CS201",
+      "title": "Data Structures",
+      "estimatedHours": 35,
+      "category": "Core CS"
+    },
+    {
+      "index": 4,
+      "id": "c-cs301",
+      "code": "CS301",
+      "title": "Machine Learning Foundations",
+      "estimatedHours": 45,
+      "category": "AI/ML"
+    },
+    {
+      "index": 5,
+      "id": "c-cs302",
+      "code": "CS302",
+      "title": "Deep Learning & Neural Architectures",
+      "estimatedHours": 50,
+      "category": "AI/ML"
+    }
+  ],
+  "edges": [
+    { "u": 0, "v": 3, "fromCode": "CS101", "toCode": "CS201" },
+    { "u": 0, "v": 4, "fromCode": "CS101", "toCode": "CS301" },
+    { "u": 1, "v": 4, "fromCode": "MATH201", "toCode": "CS301" },
+    { "u": 2, "v": 4, "fromCode": "MATH202", "toCode": "CS301" },
+    { "u": 4, "v": 5, "fromCode": "CS301", "toCode": "CS302" }
+  ]
+}

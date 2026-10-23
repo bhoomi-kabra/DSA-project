@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { runCppGraphEngine, CppGraphInput } from "./cpp-graph-runner";
 
 export interface GraphNode {
   id: string;
@@ -277,4 +278,286 @@ export class GraphService {
       edges: cppEdges,
     };
   }
+
+  /**
+   * Feature: Execute C++ Graph Algorithm Engine on Database Data
+   * Derives real graph data from PostgreSQL via Prisma, invokes C++ engine,
+   * overlays student progress, and formats layout for React Flow visualization.
+   */
+  static async executeCppRoadmap(options: {
+    goalSlug?: string;
+    userId?: string;
+    weeklyStudyHours?: number;
+    operation?: "goal-roadmap" | "topological-sort" | "analyze";
+  } = {}) {
+    const { goalSlug, userId, operation } = options;
+
+    let targetCourseIds: string[] = [];
+    let goalMeta: any = null;
+
+    if (goalSlug) {
+      const goal = await prisma.goal.findUnique({
+        where: { slug: goalSlug },
+        include: {
+          courses: {
+            include: { course: true },
+          },
+        },
+      });
+
+      if (!goal) {
+        throw new Error(`Goal '${goalSlug}' not found.`);
+      }
+
+      goalMeta = {
+        id: goal.id,
+        name: goal.name,
+        slug: goal.slug,
+        description: goal.description,
+      };
+
+      // Target all courses associated with this goal to extract the full track curriculum
+      targetCourseIds = goal.courses.map((gc) => gc.courseId);
+    }
+
+    // Fetch full graph from database
+    const fullGraph = await this.getFullGraph();
+
+    // Map course ID to index in fullGraph
+    const idToIndex = new Map<string, number>();
+    fullGraph.nodes.forEach((n, idx) => {
+      idToIndex.set(n.id, idx);
+    });
+
+    const targetIndices = targetCourseIds
+      .map((id) => idToIndex.get(id))
+      .filter((idx): idx is number => idx !== undefined);
+
+    // Prepare C++ engine input
+    const cppInput: CppGraphInput = {
+      operation: goalSlug ? (operation || "goal-roadmap") : (operation || "analyze"),
+      weeklyStudyHours: options.weeklyStudyHours || 10,
+      targetIndices,
+      vertices: fullGraph.nodes.map((n, idx) => ({
+        index: idx,
+        id: n.id,
+        code: n.code,
+        title: n.title,
+        estimatedHours: n.estimatedHours,
+        category: n.category,
+      })),
+      edges: fullGraph.edges.map((e) => ({
+        u: idToIndex.get(e.from)!,
+        v: idToIndex.get(e.to)!,
+        fromCode: e.fromCode,
+        toCode: e.toCode,
+      })),
+    };
+
+    // Execute C++ algorithm engine
+    const cppResult = await runCppGraphEngine(cppInput);
+
+    if (cppResult.hasCycle) {
+      return {
+        success: false,
+        hasCycle: true,
+        error: cppResult.error || "A prerequisite cycle was detected in the curriculum graph.",
+        cycleNodes: cppResult.cycleNodes,
+        blockedNodes: cppResult.blockedNodes,
+        goal: goalMeta,
+        learningOrder: [],
+        flow: { nodes: [], edges: [] },
+        diagnostics: cppResult.diagnostics,
+      };
+    }
+
+    // Student Progress overlay
+    const completedCourseIds = new Set<string>();
+    let effectiveUserId = userId;
+
+    if (!effectiveUserId) {
+      // Use demo student Alex Rivera if available
+      const firstUser = await prisma.user.findFirst();
+      if (firstUser) {
+        effectiveUserId = firstUser.id;
+      }
+    }
+
+    if (effectiveUserId) {
+      const progress = await prisma.studentProgress.findMany({
+        where: { userId: effectiveUserId, isCompleted: true },
+      });
+      progress.forEach((p) => completedCourseIds.add(p.courseId));
+    }
+
+    // Critical path lookup
+    const criticalPathSet = new Set(cppResult.criticalPathCodes || []);
+
+    // Induced subgraph forward and reverse adjacency for prerequisites and dependents
+    const subgraphRevAdj = new Map<string, string[]>(); // courseId -> array of prereq courseIds
+    const subgraphFwdAdj = new Map<string, string[]>(); // courseId -> array of unlocked courseIds
+
+    for (const e of cppResult.edges) {
+      const fromNode = cppResult.learningOrder.find((n) => n.code === e.fromCode);
+      const toNode = cppResult.learningOrder.find((n) => n.code === e.toCode);
+      if (fromNode && toNode) {
+        if (!subgraphRevAdj.has(toNode.id)) subgraphRevAdj.set(toNode.id, []);
+        subgraphRevAdj.get(toNode.id)!.push(fromNode.id);
+
+        if (!subgraphFwdAdj.has(fromNode.id)) subgraphFwdAdj.set(fromNode.id, []);
+        subgraphFwdAdj.get(fromNode.id)!.push(toNode.id);
+      }
+    }
+
+    const nodeById = new Map<string, any>();
+    cppResult.learningOrder.forEach((n) => nodeById.set(n.id, n));
+
+    // Enrich courses with status, prerequisites, dependents, and recommendations
+    const enrichedOrder = cppResult.learningOrder.map((course) => {
+      const isCompleted = completedCourseIds.has(course.id);
+      const prereqIds = subgraphRevAdj.get(course.id) || [];
+      const dependentIds = subgraphFwdAdj.get(course.id) || [];
+
+      const prerequisites = prereqIds.map((pId) => {
+        const p = nodeById.get(pId);
+        return {
+          id: pId,
+          code: p?.code || "",
+          title: p?.title || "",
+          isCompleted: completedCourseIds.has(pId),
+        };
+      });
+
+      const dependents = dependentIds.map((dId) => {
+        const d = nodeById.get(dId);
+        return {
+          id: dId,
+          code: d?.code || "",
+          title: d?.title || "",
+          isCompleted: completedCourseIds.has(dId),
+        };
+      });
+
+      const unmetPrerequisites = prerequisites.filter((p) => !p.isCompleted);
+      const isCritical = criticalPathSet.has(course.code);
+
+      let status: "completed" | "in-progress" | "locked" = "locked";
+      if (isCompleted) {
+        status = "completed";
+      } else if (unmetPrerequisites.length === 0) {
+        status = "in-progress";
+      } else {
+        status = "locked";
+      }
+
+      let recommendationReason = "";
+      if (status === "in-progress") {
+        if (isCritical) {
+          recommendationReason = "★ Critical-Path Priority — Advancing this bottleneck directly shortens the minimum roadmap completion time.";
+        } else if (dependents.length >= 2) {
+          recommendationReason = `Foundational Anchor — Unlocks ${dependents.length} downstream courses in this track.`;
+        } else {
+          recommendationReason = "Available Now — All prerequisite requirements have been met.";
+        }
+      }
+
+      return {
+        ...course,
+        status,
+        isCritical,
+        isRecommended: status === "in-progress",
+        recommendationReason,
+        prerequisites,
+        dependents,
+        unmetPrerequisites,
+      };
+    });
+
+    // Compute remaining workload
+    let remainingStudyHours = 0;
+    enrichedOrder.forEach((c) => {
+      if (c.status !== "completed") {
+        remainingStudyHours += c.estimatedHours;
+      }
+    });
+
+    const recommendedNextCourses = enrichedOrder
+      .filter((c) => c.status === "in-progress")
+      .sort((a, b) => {
+        if (a.isCritical && !b.isCritical) return -1;
+        if (!a.isCritical && b.isCritical) return 1;
+        return (b.dependents?.length || 0) - (a.dependents?.length || 0);
+      });
+
+    // Build React Flow nodes and edges layout with computed levels
+    const levelCounts: Record<number, number> = {};
+    enrichedOrder.forEach((n) => {
+      levelCounts[n.level] = (levelCounts[n.level] || 0) + 1;
+    });
+
+    const levelOffset: Record<number, number> = {};
+    const HGAP = 240;
+    const VGAP = 120;
+
+    const flowNodes = enrichedOrder.map((n) => {
+      levelOffset[n.level] = levelOffset[n.level] || 0;
+      const count = levelCounts[n.level];
+      const idx = levelOffset[n.level]++;
+      const x = n.level * HGAP + 40;
+      const y = (idx - (count - 1) / 2) * VGAP + 180;
+
+      return {
+        id: n.id,
+        code: n.code,
+        title: n.title,
+        status: n.status,
+        level: n.level,
+        isCritical: n.isCritical,
+        isRecommended: n.isRecommended,
+        recommendationReason: n.recommendationReason,
+        estimatedHours: n.estimatedHours,
+        category: n.category,
+        prerequisites: n.prerequisites,
+        dependents: n.dependents,
+        unmetPrerequisites: n.unmetPrerequisites,
+        position: { x, y },
+      };
+    });
+
+    const flowEdges = cppResult.edges.map((e, idx) => {
+      const fromNode = enrichedOrder.find((n) => n.code === e.fromCode);
+      const toNode = enrichedOrder.find((n) => n.code === e.toCode);
+      return {
+        id: `e-${idx}`,
+        source: fromNode ? fromNode.id : `code-${e.fromCode}`,
+        target: toNode ? toNode.id : `code-${e.toCode}`,
+        fromCode: e.fromCode,
+        toCode: e.toCode,
+      };
+    });
+
+    return {
+      success: true,
+      algorithmEngine: "PathPilot C++ Native Engine v1.0",
+      goal: goalMeta,
+      hasCycle: false,
+      vertexCount: cppResult.vertexCount,
+      edgeCount: cppResult.edgeCount,
+      learningOrder: enrichedOrder,
+      criticalPath: cppResult.criticalPath,
+      criticalPathCodes: cppResult.criticalPathCodes,
+      studyTimeEstimates: {
+        ...cppResult.studyTimeEstimates,
+        remainingStudyHours,
+        remainingWeeks: Math.ceil(remainingStudyHours / (options.weeklyStudyHours || 10)),
+      },
+      recommendedNextCourses,
+      flow: {
+        nodes: flowNodes,
+        edges: flowEdges,
+      },
+      diagnostics: cppResult.diagnostics,
+    };
+  }
 }
+
