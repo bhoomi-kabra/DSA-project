@@ -202,7 +202,7 @@ async function runIntegrationTests() {
 
       // Build parent map from directed edges
       const parentMap = new Map<string, string[]>();
-      result.edges.forEach((e) => {
+      (result.edges || []).forEach((e) => {
         if (!parentMap.has(e.toCode)) parentMap.set(e.toCode, []);
         parentMap.get(e.toCode)!.push(e.fromCode);
       });

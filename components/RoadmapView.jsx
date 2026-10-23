@@ -43,10 +43,14 @@ import CourseNode from './CourseNode';
 import CourseDetailsDrawer from './CourseDetailsDrawer';
 import RecommendedCoursesTray from './RecommendedCoursesTray';
 import { GOALS, GOAL_SLUG_MAP } from '../data/courseData';
+import dagre from '@dagrejs/dagre';
 
 const NODE_TYPES = {
   courseNode: CourseNode,
 };
+
+const DAGRE_NODE_WIDTH = 220;
+const DAGRE_NODE_HEIGHT = 100;
 
 // ── Main Component ─────────────────────────────────────────
 export default function RoadmapView({
@@ -300,90 +304,143 @@ export default function RoadmapView({
     return { ancestorCodes: ancestors, descendantCodes: descendants };
   }, [selectedCourseCode, rawEdges, cppResult]);
 
+  // ── Compute Stable Graph Layout via Dagre ─────────────────
+  // Calculates optimal Sugiyama layered DAG positions with crossing reduction
+  // and horizontal/vertical spacing so edges never overlap or cut through nodes.
+  const layoutPositions = useMemo(() => {
+    if (!cppResult?.learningOrder || cppResult.learningOrder.length === 0) {
+      return new Map();
+    }
+
+    const g = new dagre.graphlib.Graph();
+    g.setGraph({
+      rankdir: 'LR',
+      align: 'UL',
+      nodesep: 55, // Clean vertical clearance between parallel courses
+      ranksep: 100, // Wide horizontal clearance channel for routing edges
+      edgesep: 25, // Separation between parallel routed edges
+      marginx: 50,
+      marginy: 50,
+    });
+    g.setDefaultEdgeLabel(() => ({}));
+
+    // Register all courses as nodes with bounding box
+    cppResult.learningOrder.forEach((course) => {
+      g.setNode(course.id, {
+        width: DAGRE_NODE_WIDTH,
+        height: DAGRE_NODE_HEIGHT,
+      });
+    });
+
+    // Register directed prerequisite edges
+    rawEdges.forEach((e) => {
+      const fromNode = cppResult.learningOrder.find((n) => n.code === e.fromCode);
+      const toNode = cppResult.learningOrder.find((n) => n.code === e.toCode);
+      if (fromNode && toNode) {
+        const minlen = Math.max(1, (toNode.level ?? 0) - (fromNode.level ?? 0));
+        g.setEdge(fromNode.id, toNode.id, { minlen });
+      }
+    });
+
+    dagre.layout(g);
+
+    const posMap = new Map();
+    cppResult.learningOrder.forEach((course) => {
+      const dagreNode = g.node(course.id);
+      if (dagreNode) {
+        posMap.set(course.id, {
+          x: Math.round(dagreNode.x - DAGRE_NODE_WIDTH / 2),
+          y: Math.round(dagreNode.y - DAGRE_NODE_HEIGHT / 2),
+        });
+      } else {
+        posMap.set(course.id, { x: 0, y: 0 });
+      }
+    });
+
+    return posMap;
+  }, [cppResult?.learningOrder, rawEdges]);
+
   // ── Build React Flow Nodes & Directed Edges ──────────────
-  const { flowNodes, flowEdges } = useMemo(() => {
-    if (!cppResult || !cppResult.learningOrder || cppResult.learningOrder.length === 0) {
-      return { flowNodes: [], flowEdges: [] };
+  const flowNodes = useMemo(() => {
+    if (!cppResult?.learningOrder || cppResult.learningOrder.length === 0) {
+      return [];
     }
 
     const criticalPathSet = new Set(cppResult.criticalPathCodes || []);
     const searchLower = searchQuery.trim().toLowerCase();
 
-    // Group courses by level for clean DAG layered layout
-    const levelBuckets = {};
-    cppResult.learningOrder.forEach((course) => {
-      const lvl = course.level ?? 0;
-      if (!levelBuckets[lvl]) levelBuckets[lvl] = [];
-      levelBuckets[lvl].push(course);
+    return cppResult.learningOrder.map((course) => {
+      const isSelected = selectedCourseCode === course.code;
+      const isAncestor = highlightMode === 'ancestors' && ancestorCodes.has(course.code);
+      const isDescendant = highlightMode === 'descendants' && descendantCodes.has(course.code);
+
+      let highlightRole = null;
+      if (isSelected) highlightRole = 'selected';
+      else if (isAncestor) highlightRole = 'ancestor';
+      else if (isDescendant) highlightRole = 'descendant';
+
+      let isDimmed = false;
+      if (searchLower) {
+        const match =
+          course.code.toLowerCase().includes(searchLower) ||
+          course.title.toLowerCase().includes(searchLower) ||
+          (course.category && course.category.toLowerCase().includes(searchLower));
+        if (!match) isDimmed = true;
+      }
+
+      if (statusFilter !== 'all') {
+        if (statusFilter === 'ready' && course.status !== 'in-progress') isDimmed = true;
+        if (statusFilter === 'completed' && course.status !== 'completed') isDimmed = true;
+        if (statusFilter === 'locked' && course.status !== 'locked') isDimmed = true;
+      }
+
+      if (categoryFilter !== 'all') {
+        if (course.category !== categoryFilter) isDimmed = true;
+      }
+
+      if (highlightMode === 'ancestors' && !isAncestor && !isSelected) {
+        isDimmed = true;
+      }
+      if (highlightMode === 'descendants' && !isDescendant && !isSelected) {
+        isDimmed = true;
+      }
+
+      const pos = layoutPositions.get(course.id) || { x: 0, y: 0 };
+
+      return {
+        id: course.id,
+        type: 'courseNode',
+        position: pos,
+        selected: isSelected,
+        data: {
+          ...course,
+          isCritical: criticalPathSet.has(course.code),
+          highlightRole,
+          isDimmed,
+        },
+      };
     });
+  }, [
+    cppResult,
+    layoutPositions,
+    selectedCourseCode,
+    highlightMode,
+    ancestorCodes,
+    descendantCodes,
+    searchQuery,
+    statusFilter,
+    categoryFilter,
+  ]);
 
-    const HGAP = 260;
-    const VGAP = 130;
+  // ── Generate Directed Edges with Bold Arrowheads and Clean Routing ───
+  const flowEdges = useMemo(() => {
+    if (!cppResult?.learningOrder || cppResult.learningOrder.length === 0) {
+      return [];
+    }
 
-    const nodes = [];
+    const criticalPathSet = new Set(cppResult.criticalPathCodes || []);
 
-    Object.keys(levelBuckets).forEach((lvlStr) => {
-      const lvl = parseInt(lvlStr, 10);
-      const coursesAtLevel = levelBuckets[lvl];
-      const count = coursesAtLevel.length;
-
-      coursesAtLevel.forEach((course, idx) => {
-        const x = lvl * HGAP + 50;
-        const y = (idx - (count - 1) / 2) * VGAP + 220;
-
-        const isSelected = selectedCourseCode === course.code;
-        const isAncestor = highlightMode === 'ancestors' && ancestorCodes.has(course.code);
-        const isDescendant = highlightMode === 'descendants' && descendantCodes.has(course.code);
-
-        let highlightRole = null;
-        if (isSelected) highlightRole = 'selected';
-        else if (isAncestor) highlightRole = 'ancestor';
-        else if (isDescendant) highlightRole = 'descendant';
-
-        // Check if node is dimmed based on active filters, search, or highlight mode
-        let isDimmed = false;
-        if (searchLower) {
-          const match =
-            course.code.toLowerCase().includes(searchLower) ||
-            course.title.toLowerCase().includes(searchLower) ||
-            (course.category && course.category.toLowerCase().includes(searchLower));
-          if (!match) isDimmed = true;
-        }
-
-        if (statusFilter !== 'all') {
-          if (statusFilter === 'ready' && course.status !== 'in-progress') isDimmed = true;
-          if (statusFilter === 'completed' && course.status !== 'completed') isDimmed = true;
-          if (statusFilter === 'locked' && course.status !== 'locked') isDimmed = true;
-        }
-
-        if (categoryFilter !== 'all') {
-          if (course.category !== categoryFilter) isDimmed = true;
-        }
-
-        if (highlightMode === 'ancestors' && !isAncestor && !isSelected) {
-          isDimmed = true;
-        }
-        if (highlightMode === 'descendants' && !isDescendant && !isSelected) {
-          isDimmed = true;
-        }
-
-        nodes.push({
-          id: course.id,
-          type: 'courseNode',
-          position: { x, y },
-          selected: isSelected,
-          data: {
-            ...course,
-            isCritical: criticalPathSet.has(course.code),
-            highlightRole,
-            isDimmed,
-          },
-        });
-      });
-    });
-
-    // ── Generate Directed Edges with Bold Arrowheads ─────────
-    const edges = rawEdges.map((e, i) => {
+    return rawEdges.map((e, i) => {
       const fromNode = cppResult.learningOrder.find((n) => n.code === e.fromCode);
       const toNode = cppResult.learningOrder.find((n) => n.code === e.toCode);
       const sourceId = fromNode ? fromNode.id : (e.source || `source-${e.fromCode}`);
@@ -462,7 +519,13 @@ export default function RoadmapView({
         id: `edge-${i}-${e.fromCode}-${e.toCode}`,
         source: sourceId,
         target: targetId,
+        sourceHandle: 'out',
+        targetHandle: 'in',
         type: 'smoothstep',
+        pathOptions: {
+          borderRadius: 16,
+          offset: 20,
+        },
         animated,
         zIndex,
         style: {
@@ -477,8 +540,6 @@ export default function RoadmapView({
         },
       };
     });
-
-    return { flowNodes: nodes, flowEdges: edges };
   }, [
     cppResult,
     rawEdges,
@@ -486,9 +547,6 @@ export default function RoadmapView({
     highlightMode,
     ancestorCodes,
     descendantCodes,
-    searchQuery,
-    statusFilter,
-    categoryFilter,
   ]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(flowNodes);
@@ -498,6 +556,16 @@ export default function RoadmapView({
     setNodes(flowNodes);
     setEdges(flowEdges);
   }, [flowNodes, flowEdges, setNodes, setEdges]);
+
+  // Auto-fit viewport smoothly when a new goal/roadmap is loaded
+  useEffect(() => {
+    if (reactFlowInstance && layoutPositions.size > 0) {
+      const timer = setTimeout(() => {
+        reactFlowInstance.fitView({ padding: 0.18, duration: 450 });
+      }, 60);
+      return () => clearTimeout(timer);
+    }
+  }, [reactFlowInstance, targetGoalSlug, layoutPositions]);
 
   // Handle node selection: updates selected course and recalculates highlight chain without stale state
   const onNodeClick = useCallback((event, node) => {
@@ -513,7 +581,7 @@ export default function RoadmapView({
     if (reactFlowInstance) {
       const node = nodes.find((n) => n.data?.code === code);
       if (node) {
-        reactFlowInstance.setCenter(node.position.x + 90, node.position.y + 40, {
+        reactFlowInstance.setCenter(node.position.x + 105, node.position.y + 49, {
           zoom: 1.1,
           duration: 600,
         });
@@ -538,7 +606,7 @@ export default function RoadmapView({
 
   const handleFitView = useCallback(() => {
     if (reactFlowInstance) {
-      reactFlowInstance.fitView({ padding: 0.2, duration: 400 });
+      reactFlowInstance.fitView({ padding: 0.18, duration: 400 });
     }
   }, [reactFlowInstance]);
 
@@ -549,8 +617,9 @@ export default function RoadmapView({
     setSelectedCourseCode(null);
     setHighlightMode(null);
     setHighlightNotice(null);
+    setNodes(flowNodes);
     handleFitView();
-  }, [handleFitView]);
+  }, [handleFitView, flowNodes, setNodes]);
 
   // ── Empty state: No Goal Selected ────────────────────────
   if (!goalId) {
@@ -960,7 +1029,7 @@ export default function RoadmapView({
       {!loading && !error && (
         <div
           ref={reactFlowWrapper}
-          style={{ width: '100%', height: 500, position: 'relative', overflow: 'hidden' }}
+          style={{ width: '100%', height: 640, minHeight: 560, position: 'relative', overflow: 'hidden' }}
         >
           <ReactFlow
             nodes={nodes}
@@ -976,11 +1045,13 @@ export default function RoadmapView({
             }}
             onInit={setReactFlowInstance}
             fitView
-            fitViewOptions={{ padding: 0.2 }}
+            fitViewOptions={{ padding: 0.18 }}
             proOptions={{ hideAttribution: true }}
-            nodesDraggable={false}
+            nodesDraggable={true}
             nodesConnectable={false}
             elementsSelectable={true}
+            minZoom={0.2}
+            maxZoom={2.2}
             colorMode="dark"
           >
             <Background color="rgba(255, 255, 255, 0.04)" gap={24} size={1} />
