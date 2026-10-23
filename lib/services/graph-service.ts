@@ -544,6 +544,7 @@ export class GraphService {
       vertexCount: cppResult.vertexCount,
       edgeCount: cppResult.edgeCount,
       learningOrder: enrichedOrder,
+      edges: cppResult.edges,
       criticalPath: cppResult.criticalPath,
       criticalPathCodes: cppResult.criticalPathCodes,
       studyTimeEstimates: {

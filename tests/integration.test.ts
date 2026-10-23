@@ -121,6 +121,15 @@ async function runIntegrationTests() {
       const demoUser = await prisma.user.findFirst();
       if (!demoUser) throw new Error("Demo user not found");
 
+      const cs101Course = await prisma.course.findUnique({ where: { code: "CS101" } });
+      if (cs101Course) {
+        await prisma.studentProgress.upsert({
+          where: { userId_courseId: { userId: demoUser.id, courseId: cs101Course.id } },
+          create: { userId: demoUser.id, courseId: cs101Course.id, isCompleted: true },
+          update: { isCompleted: true },
+        });
+      }
+
       const result = await GraphService.executeCppRoadmap({
         goalSlug: "machine-learning-engineer",
         userId: demoUser.id,
@@ -156,6 +165,96 @@ async function runIntegrationTests() {
       }
       if (result.flow.edges.length < 10) {
         throw new Error(`Expected at least 10 flow edges, got ${result.flow.edges.length}`);
+      }
+    });
+
+    // Test 7: Prerequisite Directed Edges Validation
+    await test("Prerequisite edges direction and matching endpoints", async () => {
+      const result = await GraphService.executeCppRoadmap({
+        goalSlug: "machine-learning-engineer",
+      });
+
+      if (!result.edges || result.edges.length === 0) {
+        throw new Error("Missing edges in C++ roadmap result");
+      }
+
+      // Check that every edge points from prerequisite to dependent
+      const nodeMap = new Map<string, any>();
+      result.learningOrder.forEach((n) => nodeMap.set(n.code, n));
+
+      for (const e of result.edges) {
+        const fromNode = nodeMap.get(e.fromCode);
+        const toNode = nodeMap.get(e.toCode);
+        if (!fromNode) throw new Error(`Edge source not found in learning order: ${e.fromCode}`);
+        if (!toNode) throw new Error(`Edge target not found in learning order: ${e.toCode}`);
+        // Prerequisite level must be strictly less than dependent level
+        if (fromNode.level >= toNode.level) {
+          throw new Error(`Edge violates prerequisite DAG level ordering: ${e.fromCode} (L${fromNode.level}) -> ${e.toCode} (L${toNode.level})`);
+        }
+      }
+    });
+
+    // Test 8: Prerequisite Ancestor Traversal (BFS, Multi-branch, & Foundational edge cases)
+    await test("Prerequisite Ancestor Traversal BFS correctness", async () => {
+      const result = await GraphService.executeCppRoadmap({
+        goalSlug: "machine-learning-engineer",
+      });
+
+      // Build parent map from directed edges
+      const parentMap = new Map<string, string[]>();
+      result.edges.forEach((e) => {
+        if (!parentMap.has(e.toCode)) parentMap.set(e.toCode, []);
+        parentMap.get(e.toCode)!.push(e.fromCode);
+      });
+
+      // Helper BFS traversal (identical to UI implementation)
+      function getAncestors(targetCode: string): Set<string> {
+        const ancestors = new Set<string>();
+        const visited = new Set<string>([targetCode]);
+        const queue = [...(parentMap.get(targetCode) || [])];
+
+        for (const p of queue) {
+          visited.add(p);
+          ancestors.add(p);
+        }
+
+        let head = 0;
+        while (head < queue.length) {
+          const curr = queue[head++];
+          const parents = parentMap.get(curr) || [];
+          for (const p of parents) {
+            if (!visited.has(p)) {
+              visited.add(p);
+              ancestors.add(p);
+              queue.push(p);
+            }
+          }
+        }
+        return ancestors;
+      }
+
+      // Case A: Foundational course has 0 ancestors
+      const math201Ancestors = getAncestors("MATH201");
+      if (math201Ancestors.size !== 0) {
+        throw new Error(`Expected MATH201 to have 0 ancestors, got ${math201Ancestors.size}`);
+      }
+
+      // Case B: CS301 (Machine Learning) has multiple prerequisite branches (Python & Math)
+      const cs301Ancestors = getAncestors("CS301");
+      if (!cs301Ancestors.has("CS101")) throw new Error("CS301 must have CS101 as prerequisite ancestor");
+      if (!cs301Ancestors.has("MATH201")) throw new Error("CS301 must have MATH201 as prerequisite ancestor");
+      if (cs301Ancestors.has("CS301")) throw new Error("CS301 must not be in its own ancestor set");
+
+      // Case C: Deep Learning (CS302) requires ML (CS301) and all its ancestors
+      const cs302Ancestors = getAncestors("CS302");
+      if (!cs302Ancestors.has("CS301")) throw new Error("CS302 must have CS301 as ancestor");
+      if (!cs302Ancestors.has("CS101")) throw new Error("CS302 must have CS101 as indirect ancestor");
+      if (!cs302Ancestors.has("MATH201")) throw new Error("CS302 must have MATH201 as indirect ancestor");
+
+      // Case D: Capstone (CS406) encompasses the full pipeline
+      const cs406Ancestors = getAncestors("CS406");
+      if (cs406Ancestors.size < 5) {
+        throw new Error(`Expected CS406 to have at least 5 ancestors, got ${cs406Ancestors.size}`);
       }
     });
   } finally {

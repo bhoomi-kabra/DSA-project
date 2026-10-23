@@ -40,11 +40,10 @@ function CourseNode({ id, data, selected }) {
         position={Position.Left}
         id="in"
         style={{
-          background: '#59B8FF',
-          width: 7,
-          height: 7,
-          border: '1.5px solid #0E1425',
-          left: -4,
+          background: '#38BDF8',
+          width: 9,
+          height: 9,
+          border: '2px solid #0B1020',
         }}
       />
 
@@ -52,6 +51,30 @@ function CourseNode({ id, data, selected }) {
       <div className="node-header">
         <span className="node-code">{code}</span>
         <div className="node-badges">
+          {highlightRole === 'ancestor' && (
+            <span
+              className="node-highlight-badge node-highlight-badge--ancestor"
+              title="Prerequisite ancestor course required to unlock selected target"
+            >
+              PREREQ
+            </span>
+          )}
+          {highlightRole === 'selected' && (
+            <span
+              className="node-highlight-badge node-highlight-badge--selected"
+              title="Currently selected target course"
+            >
+              TARGET
+            </span>
+          )}
+          {highlightRole === 'descendant' && (
+            <span
+              className="node-highlight-badge node-highlight-badge--descendant"
+              title="Downstream course unlocked by this course"
+            >
+              UNLOCKS
+            </span>
+          )}
           {isCritical && (
             <span className="node-cp-badge" title="Course is on the Critical Path bottleneck">
               CP
@@ -99,10 +122,9 @@ function CourseNode({ id, data, selected }) {
         id="out"
         style={{
           background: '#8B7CFF',
-          width: 7,
-          height: 7,
-          border: '1.5px solid #0E1425',
-          right: -4,
+          width: 9,
+          height: 9,
+          border: '2px solid #0B1020',
         }}
       />
     </div>

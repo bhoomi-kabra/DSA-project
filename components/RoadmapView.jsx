@@ -6,10 +6,10 @@
  * Renders an intelligent, interactive prerequisite course DAG using @xyflow/react.
  * Connected directly to the compiled C++ Graph Algorithm Engine via /api/graph/analyze.
  * Features:
- * - Support for all 3 learning goals (ML, Full Stack, Placement Prep).
- * - Custom CourseNode with left/right handles for clear directed workflow.
- * - Course Details Drawer with unmet prerequisite explanations and live progress toggling.
- * - Prerequisite Path (Ancestors) and Downstream (Descendants) highlighting.
+ * - Direct, high-contrast prerequisite arrows flowing from Prerequisite -> Dependent course.
+ * - Robust BFS-based "Highlight Prerequisite Ancestors" traversing direct & indirect dependencies.
+ * - Visible directional arrowheads (MarkerType.ArrowClosed) with dynamic highlight coloring.
+ * - Course Details Drawer with prerequisite breakdown and live progress updating.
  * - Recommended Next Courses tray with rationale tags.
  * - Real-time search, status filtering, category filtering, and weekly study pace adjustment.
  * - Workload vs. Critical-Path metrics with clear serial vs parallel explanations.
@@ -22,25 +22,21 @@ import {
   MiniMap,
   useNodesState,
   useEdgesState,
-  addEdge,
   MarkerType,
 } from '@xyflow/react';
 import {
   GitBranch,
-  Cpu,
   AlertTriangle,
   Clock,
   Layers,
   Sparkles,
   Zap,
-  Info,
   RefreshCw,
   Search,
-  Filter,
   Maximize2,
   HelpCircle,
-  CheckCircle2,
-  RotateCcw,
+  X,
+  Info,
 } from 'lucide-react';
 
 import CourseNode from './CourseNode';
@@ -72,6 +68,7 @@ export default function RoadmapView({
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [weeklyStudyHours, setWeeklyStudyHours] = useState(15);
   const [showLegend, setShowLegend] = useState(false);
+  const [highlightNotice, setHighlightNotice] = useState(null);
 
   // Selection & highlighting
   const [selectedCourseCode, setSelectedCourseCode] = useState(initialSelectedCourseCode);
@@ -162,7 +159,6 @@ export default function RoadmapView({
         });
 
         if (response.ok) {
-          // Re-run C++ engine to recalculate DAG, unlocked states, and critical path
           await fetchCppRoadmap(targetGoalSlug, weeklyStudyHours);
         } else {
           const errData = await response.json();
@@ -194,56 +190,117 @@ export default function RoadmapView({
     return cppResult.learningOrder.find((c) => c.code === selectedCourseCode) || null;
   }, [selectedCourseCode, cppResult]);
 
-  // ── Compute Ancestors (Prerequisite chain) and Descendants ─
+  // ── Extract Raw Edges safely from C++ engine or flow ───────
+  const rawEdges = useMemo(() => {
+    if (!cppResult) return [];
+    if (Array.isArray(cppResult.edges) && cppResult.edges.length > 0) {
+      return cppResult.edges;
+    }
+    if (cppResult.flow && Array.isArray(cppResult.flow.edges)) {
+      return cppResult.flow.edges;
+    }
+    return [];
+  }, [cppResult]);
+
+  // ── Compute Ancestors (Prerequisites) & Descendants (Dependents) ──
   const { ancestorCodes, descendantCodes } = useMemo(() => {
-    if (!selectedCourseCode || !cppResult?.edges || !cppResult?.learningOrder) {
+    if (!selectedCourseCode || !cppResult?.learningOrder || cppResult.learningOrder.length === 0) {
       return { ancestorCodes: new Set(), descendantCodes: new Set() };
     }
 
-    // Build adjacency maps by code
-    const parentMap = new Map(); // toCode -> array of fromCodes
-    const childMap = new Map();  // fromCode -> array of toCodes
+    // Build directed adjacency maps:
+    // parentMap: child course code -> array of direct prerequisite course codes (incoming edges u -> v)
+    // childMap: parent course code -> array of downstream course codes it unlocks (outgoing edges u -> v)
+    const parentMap = new Map();
+    const childMap = new Map();
 
-    cppResult.edges.forEach((e) => {
-      if (!parentMap.has(e.toCode)) parentMap.set(e.toCode, []);
-      parentMap.get(e.toCode).push(e.fromCode);
+    // 1. Populate from raw directed edges (u = prerequisite -> v = dependent)
+    rawEdges.forEach((e) => {
+      if (e.fromCode && e.toCode) {
+        if (!parentMap.has(e.toCode)) parentMap.set(e.toCode, []);
+        if (!parentMap.get(e.toCode).includes(e.fromCode)) {
+          parentMap.get(e.toCode).push(e.fromCode);
+        }
 
-      if (!childMap.has(e.fromCode)) childMap.set(e.fromCode, []);
-      childMap.get(e.fromCode).push(e.toCode);
+        if (!childMap.has(e.fromCode)) childMap.set(e.fromCode, []);
+        if (!childMap.get(e.fromCode).includes(e.toCode)) {
+          childMap.get(e.fromCode).push(e.toCode);
+        }
+      }
     });
 
-    // BFS for Ancestors (all prerequisites)
+    // 2. Also incorporate direct course metadata from enriched learningOrder as reinforcement
+    cppResult.learningOrder.forEach((course) => {
+      if (Array.isArray(course.prerequisites)) {
+        if (!parentMap.has(course.code)) parentMap.set(course.code, []);
+        course.prerequisites.forEach((pr) => {
+          if (pr.code && !parentMap.get(course.code).includes(pr.code)) {
+            parentMap.get(course.code).push(pr.code);
+          }
+        });
+      }
+      if (Array.isArray(course.dependents)) {
+        if (!childMap.has(course.code)) childMap.set(course.code, []);
+        course.dependents.forEach((dep) => {
+          if (dep.code && !childMap.get(course.code).includes(dep.code)) {
+            childMap.get(course.code).push(dep.code);
+          }
+        });
+      }
+    });
+
+    // BFS Algorithm for Prerequisite Ancestors:
+    // Starts at direct prerequisites of selected course, traverses upstream, visits all branches in O(V + E)
     const ancestors = new Set();
-    const q1 = [selectedCourseCode];
-    while (q1.length > 0) {
-      const curr = q1.shift();
+    const visitedAncestors = new Set([selectedCourseCode]); // Prevent self-inclusion and cycles
+    const queue1 = [...(parentMap.get(selectedCourseCode) || [])];
+
+    for (const p of queue1) {
+      visitedAncestors.add(p);
+      ancestors.add(p);
+    }
+
+    let head1 = 0;
+    while (head1 < queue1.length) {
+      const curr = queue1[head1++];
       const parents = parentMap.get(curr) || [];
       for (const p of parents) {
-        if (!ancestors.has(p)) {
+        if (!visitedAncestors.has(p)) {
+          visitedAncestors.add(p);
           ancestors.add(p);
-          q1.push(p);
+          queue1.push(p);
         }
       }
     }
 
-    // BFS for Descendants (all unlocked downstream courses)
+    // BFS Algorithm for Unlocked Descendants:
+    // Starts at direct children of selected course, traverses downstream in O(V + E)
     const descendants = new Set();
-    const q2 = [selectedCourseCode];
-    while (q2.length > 0) {
-      const curr = q2.shift();
+    const visitedDescendants = new Set([selectedCourseCode]);
+    const queue2 = [...(childMap.get(selectedCourseCode) || [])];
+
+    for (const c of queue2) {
+      visitedDescendants.add(c);
+      descendants.add(c);
+    }
+
+    let head2 = 0;
+    while (head2 < queue2.length) {
+      const curr = queue2[head2++];
       const children = childMap.get(curr) || [];
       for (const c of children) {
-        if (!descendants.has(c)) {
+        if (!visitedDescendants.has(c)) {
+          visitedDescendants.add(c);
           descendants.add(c);
-          q2.push(c);
+          queue2.push(c);
         }
       }
     }
 
     return { ancestorCodes: ancestors, descendantCodes: descendants };
-  }, [selectedCourseCode, cppResult]);
+  }, [selectedCourseCode, rawEdges, cppResult]);
 
-  // ── Build React Flow Nodes & Edges ───────────────────────
+  // ── Build React Flow Nodes & Directed Edges ──────────────
   const { flowNodes, flowEdges } = useMemo(() => {
     if (!cppResult || !cppResult.learningOrder || cppResult.learningOrder.length === 0) {
       return { flowNodes: [], flowEdges: [] };
@@ -252,7 +309,7 @@ export default function RoadmapView({
     const criticalPathSet = new Set(cppResult.criticalPathCodes || []);
     const searchLower = searchQuery.trim().toLowerCase();
 
-    // Group courses by level for vertical distribution
+    // Group courses by level for clean DAG layered layout
     const levelBuckets = {};
     cppResult.learningOrder.forEach((course) => {
       const lvl = course.level ?? 0;
@@ -283,7 +340,7 @@ export default function RoadmapView({
         else if (isAncestor) highlightRole = 'ancestor';
         else if (isDescendant) highlightRole = 'descendant';
 
-        // Check if node is dimmed based on active filters or search
+        // Check if node is dimmed based on active filters, search, or highlight mode
         let isDimmed = false;
         if (searchLower) {
           const match =
@@ -325,63 +382,98 @@ export default function RoadmapView({
       });
     });
 
-    // Map edges
-    const edges = (cppResult.edges || []).map((e, i) => {
+    // ── Generate Directed Edges with Bold Arrowheads ─────────
+    const edges = rawEdges.map((e, i) => {
       const fromNode = cppResult.learningOrder.find((n) => n.code === e.fromCode);
       const toNode = cppResult.learningOrder.find((n) => n.code === e.toCode);
-      const sourceId = fromNode ? fromNode.id : `source-${e.fromCode}`;
-      const targetId = toNode ? toNode.id : `target-${e.toCode}`;
+      const sourceId = fromNode ? fromNode.id : (e.source || `source-${e.fromCode}`);
+      const targetId = toNode ? toNode.id : (e.target || `target-${e.toCode}`);
 
       const isCriticalEdge =
         criticalPathSet.has(e.fromCode) && criticalPathSet.has(e.toCode);
 
+      // Prerequisite edge in ancestor chain:
+      // Starts at an ancestor course (fromCode) and leads to an ancestor course or the selected target course (toCode)
       const isAncestorEdge =
         highlightMode === 'ancestors' &&
-        (ancestorCodes.has(e.fromCode) || e.fromCode === selectedCourseCode) &&
+        ancestorCodes.has(e.fromCode) &&
         (ancestorCodes.has(e.toCode) || e.toCode === selectedCourseCode);
 
+      // Downstream edge in descendant chain:
+      // Starts at selected course or descendant course (fromCode) and leads to a descendant course (toCode)
       const isDescendantEdge =
         highlightMode === 'descendants' &&
         (descendantCodes.has(e.fromCode) || e.fromCode === selectedCourseCode) &&
-        (descendantCodes.has(e.toCode) || e.toCode === selectedCourseCode);
+        descendantCodes.has(e.toCode);
 
-      const isHighlighted = isAncestorEdge || isDescendantEdge;
-
-      let strokeColor = 'rgba(255, 255, 255, 0.18)';
-      let strokeWidth = 1.5;
+      // Default high-contrast slate edge styling against dark background
+      let strokeColor = '#64748B';
+      let strokeWidth = 2;
       let animated = false;
+      let markerColor = '#64748B';
+      let markerSize = 18;
+      let zIndex = 2;
 
       if (isCriticalEdge) {
-        strokeColor = 'rgba(245, 166, 35, 0.85)';
+        strokeColor = '#F5A623';
         strokeWidth = 2.5;
         animated = true;
+        markerColor = '#F5A623';
+        markerSize = 20;
+        zIndex = 3;
       }
 
-      if (isHighlighted) {
-        strokeColor = isAncestorEdge ? '#59B8FF' : '#C084FC';
-        strokeWidth = 2.5;
-        animated = true;
+      if (highlightMode === 'ancestors') {
+        if (isAncestorEdge) {
+          strokeColor = '#38BDF8'; // Vivid Cyan for ancestor prerequisite chain
+          strokeWidth = 3;
+          animated = true;
+          markerColor = '#38BDF8';
+          markerSize = 22;
+          zIndex = 10;
+        } else {
+          // Dim non-ancestor edges
+          strokeColor = 'rgba(255, 255, 255, 0.08)';
+          strokeWidth = 1.2;
+          animated = false;
+          markerColor = 'rgba(255, 255, 255, 0.12)';
+          markerSize = 14;
+          zIndex = 1;
+        }
+      } else if (highlightMode === 'descendants') {
+        if (isDescendantEdge) {
+          strokeColor = '#C084FC'; // Vivid Purple for unlocked descendant chain
+          strokeWidth = 3;
+          animated = true;
+          markerColor = '#C084FC';
+          markerSize = 22;
+          zIndex = 10;
+        } else {
+          strokeColor = 'rgba(255, 255, 255, 0.08)';
+          strokeWidth = 1.2;
+          animated = false;
+          markerColor = 'rgba(255, 255, 255, 0.12)';
+          markerSize = 14;
+          zIndex = 1;
+        }
       }
 
       return {
         id: `edge-${i}-${e.fromCode}-${e.toCode}`,
         source: sourceId,
         target: targetId,
-        sourceHandle: 'out',
-        targetHandle: 'in',
         type: 'smoothstep',
         animated,
+        zIndex,
         style: {
           stroke: strokeColor,
           strokeWidth,
         },
         markerEnd: {
           type: MarkerType.ArrowClosed,
-          color: isHighlighted
-            ? isAncestorEdge ? '#59B8FF' : '#C084FC'
-            : isCriticalEdge ? '#F5A623' : 'rgba(255, 255, 255, 0.28)',
-          width: 14,
-          height: 14,
+          color: markerColor,
+          width: markerSize,
+          height: markerSize,
         },
       };
     });
@@ -389,6 +481,7 @@ export default function RoadmapView({
     return { flowNodes: nodes, flowEdges: edges };
   }, [
     cppResult,
+    rawEdges,
     selectedCourseCode,
     highlightMode,
     ancestorCodes,
@@ -406,17 +499,17 @@ export default function RoadmapView({
     setEdges(flowEdges);
   }, [flowNodes, flowEdges, setNodes, setEdges]);
 
-  // Handle node selection
+  // Handle node selection: updates selected course and recalculates highlight chain without stale state
   const onNodeClick = useCallback((event, node) => {
-    setSelectedCourseCode(node.data?.code || null);
-    setHighlightMode(null);
+    const code = node.data?.code || null;
+    setSelectedCourseCode(code);
+    setHighlightNotice(null);
   }, []);
 
   const handleSelectCourseByCode = useCallback((code) => {
     setSelectedCourseCode(code);
-    setHighlightMode(null);
+    setHighlightNotice(null);
 
-    // If reactFlowInstance is ready, center on node
     if (reactFlowInstance) {
       const node = nodes.find((n) => n.data?.code === code);
       if (node) {
@@ -427,6 +520,21 @@ export default function RoadmapView({
       }
     }
   }, [reactFlowInstance, nodes]);
+
+  // ── Highlight Ancestors Action with Clear User Guidance ───
+  const handleToggleHighlightAncestors = useCallback(() => {
+    if (!selectedCourseCode) {
+      setHighlightNotice('Select a course first to highlight its prerequisite ancestors.');
+      return;
+    }
+    if (ancestorCodes.size === 0) {
+      setHighlightNotice(`${selectedCourseCode} is a foundational course with no prior prerequisite ancestors.`);
+      setHighlightMode(null);
+      return;
+    }
+    setHighlightNotice(null);
+    setHighlightMode((prev) => (prev === 'ancestors' ? null : 'ancestors'));
+  }, [selectedCourseCode, ancestorCodes]);
 
   const handleFitView = useCallback(() => {
     if (reactFlowInstance) {
@@ -440,6 +548,7 @@ export default function RoadmapView({
     setCategoryFilter('all');
     setSelectedCourseCode(null);
     setHighlightMode(null);
+    setHighlightNotice(null);
     handleFitView();
   }, [handleFitView]);
 
@@ -464,8 +573,6 @@ export default function RoadmapView({
       </div>
     );
   }
-
-  const currentGoalMeta = GOALS.find((g) => g.id === goalId || g.slug === goalId);
 
   return (
     <div style={{ width: '100%', position: 'relative' }}>
@@ -505,7 +612,7 @@ export default function RoadmapView({
             <span style={{ color: '#8A99B5', fontSize: '0.72rem' }}>
               ⚡ Computed in {cppResult.diagnostics.executionTimeMs.toFixed(2)}ms &bull;{' '}
               {cppResult.learningOrder?.length || 0} courses &bull;{' '}
-              {cppResult.edges?.length || 0} prerequisite dependencies
+              {rawEdges.length} prerequisite dependencies
             </span>
           )}
         </div>
@@ -571,12 +678,30 @@ export default function RoadmapView({
             </select>
           )}
 
-          {(searchQuery || statusFilter !== 'all' || categoryFilter !== 'all' || selectedCourseCode) && (
+          {/* Highlight Ancestors Button on Toolbar */}
+          <button
+            type="button"
+            id="toolbar-btn-highlight-ancestors"
+            className={`toolbar-btn ${highlightMode === 'ancestors' ? 'toolbar-btn--active' : ''}`}
+            onClick={handleToggleHighlightAncestors}
+            title={
+              selectedCourseCode
+                ? `Toggle prerequisite ancestors for ${selectedCourseCode}`
+                : 'Select a course to highlight its prerequisite ancestors'
+            }
+          >
+            <GitBranch size={12} />
+            {highlightMode === 'ancestors'
+              ? `Ancestors (${ancestorCodes.size})`
+              : 'Highlight Ancestors'}
+          </button>
+
+          {(searchQuery || statusFilter !== 'all' || categoryFilter !== 'all' || selectedCourseCode || highlightMode) && (
             <button
               type="button"
               className="toolbar-btn"
               onClick={handleResetFilters}
-              title="Reset all filters"
+              title="Reset all filters and highlights"
             >
               Reset
             </button>
@@ -626,6 +751,67 @@ export default function RoadmapView({
           </button>
         </div>
       </div>
+
+      {/* ── Active Highlighting or Notice Banner ──────────── */}
+      {highlightNotice && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '8px 16px',
+            background: 'rgba(245, 166, 35, 0.12)',
+            borderBottom: '1px solid rgba(245, 166, 35, 0.3)',
+            color: '#F5A623',
+            fontSize: '0.76rem',
+            fontWeight: 500,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Info size={14} />
+            <span>{highlightNotice}</span>
+          </div>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            style={{ padding: '2px 6px', color: '#F5A623' }}
+            onClick={() => setHighlightNotice(null)}
+          >
+            <X size={12} />
+          </button>
+        </div>
+      )}
+
+      {highlightMode === 'ancestors' && selectedCourseCode && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '8px 16px',
+            background: 'rgba(56, 189, 248, 0.12)',
+            borderBottom: '1px solid rgba(56, 189, 248, 0.3)',
+            color: '#38BDF8',
+            fontSize: '0.76rem',
+            fontWeight: 500,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <GitBranch size={14} />
+            <span>
+              Showing <strong>{ancestorCodes.size}</strong> prerequisite ancestor{ancestorCodes.size === 1 ? '' : 's'} for <strong>{selectedCourseCode}</strong> (connected arrows highlighted in cyan).
+            </span>
+          </div>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            style={{ padding: '3px 10px', fontSize: '0.72rem', color: '#38BDF8', border: '1px solid rgba(56, 189, 248, 0.35)', borderRadius: 6 }}
+            onClick={() => setHighlightMode(null)}
+          >
+            Clear Highlights
+          </button>
+        </div>
+      )}
 
       {/* ── Metrics Strip: Total Workload vs Critical Path ── */}
       {cppResult?.studyTimeEstimates && !error && (
@@ -786,6 +972,7 @@ export default function RoadmapView({
             onPaneClick={() => {
               setSelectedCourseCode(null);
               setHighlightMode(null);
+              setHighlightNotice(null);
             }}
             onInit={setReactFlowInstance}
             fitView
@@ -807,6 +994,8 @@ export default function RoadmapView({
             />
             <MiniMap
               nodeColor={(n) => {
+                if (n.data?.highlightRole === 'selected') return '#F5A623';
+                if (n.data?.highlightRole === 'ancestor') return '#38BDF8';
                 if (n.data?.status === 'completed') return '#52D9A4';
                 if (n.data?.status === 'in-progress') return '#8B7CFF';
                 return '#374151';
@@ -826,14 +1015,20 @@ export default function RoadmapView({
               course={selectedCourse}
               updatingProgress={updatingProgress}
               highlightMode={highlightMode}
+              ancestorCount={ancestorCodes.size}
+              descendantCount={descendantCodes.size}
               onClose={() => {
                 setSelectedCourseCode(null);
                 setHighlightMode(null);
+                setHighlightNotice(null);
               }}
               onToggleComplete={handleToggleComplete}
-              onHighlightAncestors={() => setHighlightMode('ancestors')}
-              onHighlightDescendants={() => setHighlightMode('descendants')}
-              onClearHighlights={() => setHighlightMode(null)}
+              onHighlightAncestors={handleToggleHighlightAncestors}
+              onHighlightDescendants={() => setHighlightMode((prev) => (prev === 'descendants' ? null : 'descendants'))}
+              onClearHighlights={() => {
+                setHighlightMode(null);
+                setHighlightNotice(null);
+              }}
               onSelectCourse={handleSelectCourseByCode}
             />
           )}
@@ -859,10 +1054,18 @@ export default function RoadmapView({
                 </div>
                 <div className="legend-item">
                   <div className="legend-dot" style={{ background: '#F5A623' }} />
+                  <span>Target Selected Course</span>
+                </div>
+                <div className="legend-item">
+                  <div className="legend-dot" style={{ background: '#38BDF8' }} />
+                  <span>Prerequisite Ancestor Course</span>
+                </div>
+                <div className="legend-item">
+                  <div className="legend-dot" style={{ background: '#F5A623' }} />
                   <span>CP: Critical-Path Bottleneck</span>
                 </div>
                 <div style={{ marginTop: 4, paddingTop: 4, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                  <strong>A → B:</strong> Course A is a prerequisite for Course B
+                  <strong>A &rarr; B:</strong> Course A is a prerequisite for Course B
                 </div>
               </div>
             </div>

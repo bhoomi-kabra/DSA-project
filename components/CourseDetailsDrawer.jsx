@@ -11,7 +11,6 @@ import {
   ArrowRight,
   Clock,
   Layers,
-  Eye,
   RotateCcw,
 } from 'lucide-react';
 
@@ -25,6 +24,8 @@ export default function CourseDetailsDrawer({
   onSelectCourse,
   updatingProgress = false,
   highlightMode = null,
+  ancestorCount = 0,
+  descendantCount = 0,
 }) {
   if (!course) return null;
 
@@ -83,8 +84,10 @@ export default function CourseDetailsDrawer({
             <span className="drawer-meta-val">Level {course.level ?? 0}</span>
           </div>
           <div className="drawer-meta-item">
-            <span className="drawer-meta-lbl">Direct Prerequisites</span>
-            <span className="drawer-meta-val">{(course.prerequisites || []).length}</span>
+            <span className="drawer-meta-lbl">Prerequisites</span>
+            <span className="drawer-meta-val">
+              {course.prerequisites?.length || 0} direct ({ancestorCount} total)
+            </span>
           </div>
         </div>
 
@@ -111,7 +114,7 @@ export default function CourseDetailsDrawer({
                   className="locked-chip"
                   style={{ cursor: 'pointer', border: 'none' }}
                   onClick={() => onSelectCourse?.(pr.code)}
-                  title={`View ${pr.code}: ${pr.title}`}
+                  title={`View prerequisite ${pr.code}: ${pr.title}`}
                 >
                   {pr.code} ↗
                 </button>
@@ -123,7 +126,7 @@ export default function CourseDetailsDrawer({
         {/* Prerequisites list */}
         <div>
           <div className="drawer-section-heading">
-            Prerequisites ({(course.prerequisites || []).length})
+            Direct Prerequisites ({(course.prerequisites || []).length})
           </div>
           {(course.prerequisites || []).length === 0 ? (
             <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
@@ -218,30 +221,51 @@ export default function CourseDetailsDrawer({
           {/* Highlight Prerequisite Path */}
           <button
             type="button"
+            id="btn-highlight-ancestors"
             className={`drawer-btn-secondary ${highlightMode === 'ancestors' ? 'toolbar-btn--active' : ''}`}
             onClick={onHighlightAncestors}
+            title={
+              ancestorCount === 0
+                ? 'Foundational course with no prior prerequisites'
+                : `Highlight all ${ancestorCount} prerequisite courses and incoming edges`
+            }
           >
             <GitBranch size={13} />
-            Highlight Prerequisite Ancestors
+            {ancestorCount === 0
+              ? 'Foundational (0 Prerequisites)'
+              : highlightMode === 'ancestors'
+              ? `✓ Highlighting ${ancestorCount} Ancestors`
+              : `Highlight Prerequisite Ancestors (${ancestorCount})`}
           </button>
 
           {/* Highlight Dependent Path */}
           <button
             type="button"
+            id="btn-highlight-descendants"
             className={`drawer-btn-secondary ${highlightMode === 'descendants' ? 'toolbar-btn--active' : ''}`}
             onClick={onHighlightDescendants}
+            title={
+              descendantCount === 0
+                ? 'Terminal course with no subsequent dependents'
+                : `Highlight all ${descendantCount} downstream courses unlocked by this course`
+            }
           >
             <Sparkles size={13} />
-            Highlight Unlocked Descendants
+            {descendantCount === 0
+              ? 'Terminal (0 Unlocked Courses)'
+              : highlightMode === 'descendants'
+              ? `✓ Highlighting ${descendantCount} Descendants`
+              : `Highlight Unlocked Descendants (${descendantCount})`}
           </button>
 
           {highlightMode && (
             <button
               type="button"
+              id="btn-clear-highlights-drawer"
               className="drawer-btn-secondary"
               onClick={onClearHighlights}
             >
-              Clear Highlights
+              Clear Highlights & Restore View
             </button>
           )}
         </div>

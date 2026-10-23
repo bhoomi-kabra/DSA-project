@@ -56,28 +56,61 @@
 
 /* Selection & highlighting */
 .course-node--selected {
-  outline: 2px solid #59B8FF !important;
-  outline-offset: 2px;
-  border-color: #59B8FF !important;
-  box-shadow: 0 0 24px rgba(89, 184, 255, 0.45) !important;
+  outline: 2.5px solid #F5A623 !important;
+  outline-offset: 3px;
+  border-color: #F5A623 !important;
+  box-shadow: 0 0 24px rgba(245, 166, 35, 0.55) !important;
   opacity: 1 !important;
+  z-index: 20 !important;
 }
 
 .course-node--ancestor {
-  border-color: #59B8FF !important;
-  box-shadow: 0 0 14px rgba(89, 184, 255, 0.3) !important;
+  outline: 2px solid #38BDF8 !important;
+  outline-offset: 2px;
+  border-color: #38BDF8 !important;
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.5) !important;
   opacity: 1 !important;
+  z-index: 15 !important;
 }
 
 .course-node--descendant {
+  outline: 2px solid #C084FC !important;
+  outline-offset: 2px;
   border-color: #C084FC !important;
-  box-shadow: 0 0 14px rgba(192, 132, 252, 0.3) !important;
+  box-shadow: 0 0 20px rgba(192, 132, 252, 0.5) !important;
   opacity: 1 !important;
+  z-index: 15 !important;
 }
 
 .course-node--dimmed {
   opacity: 0.18 !important;
-  filter: grayscale(80%);
+  filter: grayscale(75%);
+}
+
+.node-highlight-badge {
+  font-size: 0.56rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+}
+
+.node-highlight-badge--selected {
+  background: rgba(245, 166, 35, 0.25);
+  color: #F5A623;
+  border: 1px solid rgba(245, 166, 35, 0.5);
+}
+
+.node-highlight-badge--ancestor {
+  background: rgba(56, 189, 248, 0.25);
+  color: #38BDF8;
+  border: 1px solid rgba(56, 189, 248, 0.5);
+}
+
+.node-highlight-badge--descendant {
+  background: rgba(192, 132, 252, 0.25);
+  color: #C084FC;
+  border: 1px solid rgba(192, 132, 252, 0.5);
 }
 
 /* Critical path outline */
