@@ -22,11 +22,11 @@ export default function HeroGraph() {
 
   const nodeById = Object.fromEntries(nodes.map(n => [n.id, n]));
 
-  const statusColors = {
-    done:   '#52D9A4',
-    active: '#8B7CFF',
-    locked: '#55617A',
-  };
+ const statusColors = {
+  done: 'var(--hero-graph-done)',
+  active: 'var(--hero-graph-active)',
+  locked: 'var(--hero-graph-locked)',
+};
 
   return (
     <svg
@@ -45,7 +45,7 @@ export default function HeroGraph() {
             key={i}
             x1={src.x} y1={src.y}
             x2={tgt.x} y2={tgt.y}
-            stroke="rgba(255,255,255,0.08)"
+           stroke="var(--hero-graph-edge)"
             strokeWidth="1.5"
             strokeLinecap="round"
           />
@@ -70,16 +70,52 @@ export default function HeroGraph() {
           />
           {/* inner dot for active */}
           {n.status === 'active' && (
-            <circle cx={n.x} cy={n.y} r="2.2" fill="white" opacity="0.8" />
+            <circle cx={n.x} cy={n.y} r="2.2" fill="var(--hero-graph-inner-dot)" opacity="0.8" />
           )}
         </g>
       ))}
 
       {/* Labels for key nodes */}
-      <text x="18"  y="36"  fill="rgba(255,255,255,0.28)" fontSize="6" fontFamily="Inter,sans-serif">Intro</text>
-      <text x="62"  y="49"  fill="rgba(255,255,255,0.28)" fontSize="6" fontFamily="Inter,sans-serif">Core</text>
-      <text x="138" y="33"  fill="rgba(139,124,255,0.7)"  fontSize="6" fontFamily="Inter,sans-serif">Adv.</text>
-      <text x="140" y="130" fill="rgba(255,255,255,0.18)" fontSize="6" fontFamily="Inter,sans-serif">Goal</text>
+      {/* Labels for key nodes */}
+<text
+  x="18"
+  y="36"
+  fill="var(--hero-graph-label)"
+  fontSize="6"
+  fontFamily="Inter, sans-serif"
+>
+  Intro
+</text>
+
+<text
+  x="62"
+  y="49"
+  fill="var(--hero-graph-label)"
+  fontSize="6"
+  fontFamily="Inter, sans-serif"
+>
+  Core
+</text>
+
+<text
+  x="138"
+  y="33"
+  fill="var(--hero-graph-active-label)"
+  fontSize="6"
+  fontFamily="Inter, sans-serif"
+>
+  Adv.
+</text>
+
+<text
+  x="140"
+  y="130"
+  fill="var(--hero-graph-label)"
+  fontSize="6"
+  fontFamily="Inter, sans-serif"
+>
+  Goal
+</text>
     </svg>
   );
 }

@@ -1,5 +1,6 @@
 
 import { useState } from 'react';
+import ThemeToggle from './components/ThemeToggle';
 import {
   ArrowRight,
   Brain,
@@ -17,7 +18,11 @@ import {
 
 import './AuthPage.css';
 
-export default function AuthPage({ onAuthenticated }) {
+export default function AuthPage({
+  onAuthenticated,
+  theme,
+  onToggleTheme,
+}) {
   const [mode, setMode] = useState('login');
 
   const [name, setName] = useState('');
@@ -72,7 +77,7 @@ export default function AuthPage({ onAuthenticated }) {
       <section className="auth-brand-panel">
         <div className="auth-brand-top">
           <div className="auth-logo-mark">
-            <GitBranch size={23} strokeWidth={2.2} />
+            <img src="/pathpilot-mark.png" alt="PathPilot logo" />
           </div>
 
           <div className="auth-brand-name">
@@ -189,10 +194,15 @@ export default function AuthPage({ onAuthenticated }) {
 
       {/* RIGHT: LOGIN / SIGN-UP FORM */}
       <section className="auth-main-panel">
-
+<div className="auth-theme-control">
+  <ThemeToggle
+    theme={theme}
+    onToggle={onToggleTheme}
+  />
+</div>
         <div className="auth-mobile-brand">
           <div className="auth-logo-mark">
-            <GitBranch size={22} />
+            <img src="/pathpilot-mark.png" alt="" />
           </div>
           <span>PathPilot</span>
         </div>

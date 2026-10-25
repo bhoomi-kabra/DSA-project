@@ -8,7 +8,8 @@
  *   courses   → Course library with search (My Courses)
  *   progress  → Detailed per-goal progress (My Progress)
  */
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import ThemeToggle from './components/ThemeToggle';
 import './App.css';
 
 // Layout
@@ -27,7 +28,7 @@ import CoursesView     from './components/CoursesView';
 import ProgressView    from './components/ProgressView';
 
 // Data
-import { GOALS, COURSES, PROGRESS } from './data/courseData';
+import { GOALS, COURSES } from './data/courseData';
 
 // Icons
 import {
@@ -44,40 +45,7 @@ import {
 } from 'lucide-react';
 
 // ─── Overview stats config ──────────────────────────────────
-const STAT_TILES = [
-  {
-    id: 'stat-completed',
-    icon: Award,
-    iconBg: 'rgba(82,217,164,0.12)',
-    iconColor: 'var(--success)',
-    val: PROGRESS.coursesCompleted,
-    lbl: 'Completed',
-  },
-  {
-    id: 'stat-remaining',
-    icon: BookMarked,
-    iconBg: 'rgba(139,124,255,0.12)',
-    iconColor: 'var(--accent)',
-    val: PROGRESS.coursesRemaining,
-    lbl: 'Remaining',
-  },
-  {
-    id: 'stat-hours',
-    icon: BarChart2,
-    iconBg: 'rgba(89,184,255,0.12)',
-    iconColor: 'var(--accent-2)',
-    val: `${PROGRESS.hoursLogged}h`,
-    lbl: 'Hours Logged',
-  },
-  {
-    id: 'stat-streak',
-    icon: Flame,
-    iconBg: 'rgba(245,166,35,0.12)',
-    iconColor: 'var(--warn)',
-    val: `${PROGRESS.currentStreak}d`,
-    lbl: 'Streak',
-  },
-];
+
 
 // ─── Page label map ─────────────────────────────────────────
 const PAGE_LABELS = {
@@ -94,12 +62,77 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  const [theme, setTheme] = useState(() => {
+  const savedTheme = localStorage.getItem('pathpilot-theme');
+  return savedTheme === 'light' ? 'light' : 'dark';
+});
+
+useEffect(() => {
+  document.documentElement.dataset.theme = theme;
+  localStorage.setItem('pathpilot-theme', theme);
+}, [theme]);
+
+const handleToggleTheme = useCallback(() => {
+  setTheme(currentTheme =>
+    currentTheme === 'dark' ? 'light' : 'dark'
+  );
+}, []);
+
   const [isAuthenticated, setIsAuthenticated] = useState(
     () => sessionStorage.getItem('pathpilot_demo_authenticated') === 'true'
   );
 
   // Shared state for course completion and progress
   const [courses, setCourses] = useState(COURSES);
+  // Calculate dashboard statistics from the current course state
+const completedCount = courses.filter(
+  course => course.status === 'completed'
+).length;
+
+const inProgressCount = courses.filter(
+  course => course.status === 'in-progress'
+).length;
+
+const lockedCount = courses.filter(
+  course => course.status === 'locked'
+).length;
+
+const totalCourses = courses.length;
+
+const STAT_TILES = [
+  {
+    id: 'stat-completed',
+    icon: Award,
+    iconBg: 'rgba(82,217,164,0.12)',
+    iconColor: 'var(--success)',
+    val: completedCount,
+    lbl: 'Completed',
+  },
+  {
+    id: 'stat-in-progress',
+    icon: BarChart2,
+    iconBg: 'rgba(139,124,255,0.12)',
+    iconColor: 'var(--accent)',
+    val: inProgressCount,
+    lbl: 'In Progress',
+  },
+  {
+    id: 'stat-locked',
+    icon: BookMarked,
+    iconBg: 'rgba(245,166,35,0.12)',
+    iconColor: 'var(--warn)',
+    val: lockedCount,
+    lbl: 'Locked',
+  },
+  {
+    id: 'stat-total',
+    icon: GitBranch,
+    iconBg: 'rgba(89,184,255,0.12)',
+    iconColor: 'var(--accent-2)',
+    val: totalCourses,
+    lbl: 'Total Courses',
+  },
+];
   // Update the status of a course
 const handleCourseStatusChange = useCallback((courseId, newStatus) => {
   setCourses((previousCourses) =>
@@ -167,7 +200,13 @@ const handleLogout = useCallback(() => {
   }, [navigate]);
 
   if (!isAuthenticated) {
-  return <AuthPage onAuthenticated={handleAuthenticated} />;
+  return (
+    <AuthPage
+      onAuthenticated={handleAuthenticated}
+      theme={theme}
+      onToggleTheme={handleToggleTheme}
+    />
+  );
 }
 
   return (
@@ -217,16 +256,21 @@ const handleLogout = useCallback(() => {
           </div>
 
           {/* Right — avatar */}
-          <div className="topbar-right">
-            <div
-              className="avatar"
-              role="img"
-              aria-label="Student avatar"
-              title="Student Workspace"
-            >
-              S
-            </div>
-          </div>
+         <div className="topbar-right">
+  <ThemeToggle
+    theme={theme}
+    onToggle={handleToggleTheme}
+  />
+
+  <div
+    className="avatar"
+    role="img"
+    aria-label="Student avatar"
+    title="Student Workspace"
+  >
+    S
+  </div>
+</div>
         </header>
 
         {/* ── Page content ──────────────────────────────── */}
@@ -239,14 +283,14 @@ const handleLogout = useCallback(() => {
               {/* Hero */}
               <section className="hero" aria-labelledby="hero-heading">
                 <div className="hero-content">
-                  <p className="hero-eyebrow">Personalised Learning Path Planner</p>
-                  <h1 id="hero-heading" className="hero-heading">
-                    Your next skill<br />
-                    <em>starts here.</em>
-                  </h1>
+                  <p className="hero-eyebrow">PLAN YOUR NEXT LEARNING STEP</p>
+                            <h1 id="hero-heading" className="hero-heading">
+            Learn in the right order.<br />
+            <em>Know what comes next.</em>
+          </h1>
                   <p className="hero-sub">
-                    Build a learning path that matches your goals,
-                    one prerequisite at a time.
+                   Choose a goal to see which courses to learn first,
+what depends on them, and how each step connects.
                   </p>
                   <div className="hero-actions">
                     <button
@@ -300,7 +344,7 @@ const handleLogout = useCallback(() => {
               {/* Goal Cards */}
               <section aria-labelledby="goals-heading">
                 <div className="section-hd">
-                  <h2 id="goals-heading">Choose your destination</h2>
+                  <h2 id="goals-heading">What are you learning towards?</h2>
                   <button
                     className="section-link"
                     id="btn-view-all-goals"
@@ -355,8 +399,9 @@ const handleLogout = useCallback(() => {
                   <div className="sample-banner">
                     <Info size={12} aria-hidden="true" />
                     <span>
-                      <strong>Sample preview</strong> — illustrative only.
-                      Real roadmap generated by C++ algorithm backend (coming soon).
+                      <strong>Example roadmap</strong> — shown for preview.
+The final graph will use the prerequisite relationships
+returned by the C++ algorithm.
                     </span>
                   </div>
 

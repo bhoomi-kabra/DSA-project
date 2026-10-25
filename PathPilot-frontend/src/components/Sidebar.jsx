@@ -33,7 +33,8 @@ export default function Sidebar({
       <aside className={`sidebar${isOpen ? ' sidebar-open' : ''}`} aria-label="Main navigation">
         {/* Brand */}
         <div className="sidebar-brand">
-          <div className="brand-icon" aria-hidden="true">
+          <div className="brand-icon">
+  <img src="/pathpilot-mark.png" alt="" />
             {/* Simple compass-style SVG wordmark */}
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
               <circle cx="9" cy="9" r="7.5" stroke="white" strokeWidth="1.4" />

@@ -2,39 +2,37 @@
    PathPilot — Global Styles  (v2 — refined dark SaaS theme)
    ========================================================= */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap');
 
 /* ─── Design Tokens ─────────────────────────────────────── */
 :root {
-  /* Backgrounds */
-  --bg-base:       #0B1020;
-  --bg-sidebar:    #0E1425;
-  --bg-card:       #141C30;
-  --bg-elevated:   #19233A;
-  --bg-input:      #121929;
+  /* Dark theme — charcoal and terracotta */
+  --bg-base:       #191A18;
+  --bg-sidebar:    #1E211D;
+  --bg-card:       #242622;
+  --bg-elevated:   #2D302A;
+  --bg-input:      #20231F;
 
-  /* Accents */
-  --accent:        #8B7CFF;   /* primary purple */
-  --accent-dim:    rgba(139,124,255,0.14);
-  --accent-border: rgba(139,124,255,0.28);
-  --accent-2:      #59B8FF;   /* secondary sky blue */
-  --accent-2-dim:  rgba(89,184,255,0.12);
-  --accent-green:  #52D9A4;
-  --accent-green-dim: rgba(82,217,164,0.12);
+  --accent:        #C77D5A;
+  --accent-dim:    rgba(199, 125, 90, 0.14);
+  --accent-border: rgba(199, 125, 90, 0.32);
 
-  /* Text */
-  --text-primary:  #F4F6FF;
-  --text-secondary:#929DB5;
-  --text-muted:    #55617A;
+  --accent-2:      #AAB5BC;
+  --accent-2-dim:  rgba(170, 181, 188, 0.12);
 
-  /* Borders */
-  --border:        rgba(255,255,255,0.07);
-  --border-active: rgba(139,124,255,0.4);
+  --accent-green:     #91A889;
+  --accent-green-dim: rgba(145, 168, 137, 0.14);
 
-  /* Misc */
-  --success:       #52D9A4;
-  --warn:          #F5A623;
-  --danger:        #F06292;
+  --text-primary:   #EAE7DF;
+  --text-secondary: #B5B3A9;
+  --text-muted:     #85877F;
+
+  --border:        rgba(234, 231, 223, 0.09);
+  --border-active: rgba(199, 125, 90, 0.42);
+
+  --success: #91A889;
+  --warn:    #D6AD76;
+  --danger:  #DF827A;
 
   --sidebar-w:     240px;
   --topbar-h:      60px;
@@ -45,6 +43,97 @@
   --ease:          cubic-bezier(0.25,0.46,0.45,0.94);
   --t-fast:        0.15s;
   --t-med:         0.22s;
+
+  --hero-graph-edge: rgba(234, 231, 223, 0.25);
+  /* Hero graph — light theme */
+--hero-graph-done: #64805A;
+--hero-graph-active: #926B0B;
+--hero-graph-locked: #A0A59D;
+--hero-graph-label: rgba(41, 43, 37, 0.60);
+--hero-graph-active-label: #926B0B;
+--hero-graph-inner-dot: #FFFFFF;
+/* Full roadmap — dark theme */
+--roadmap-completed-bg: #252D25;
+--roadmap-completed-border: rgba(145, 168, 137, 0.5);
+--roadmap-completed-text: #A9C49D;
+
+--roadmap-progress-bg: #30251F;
+--roadmap-progress-border: rgba(199, 125, 90, 0.55);
+--roadmap-progress-text: #D99876;
+
+--roadmap-locked-bg: #242827;
+--roadmap-locked-border: rgba(170, 181, 188, 0.22);
+--roadmap-locked-text: #AAB5BC;
+
+--roadmap-edge: rgba(234, 231, 223, 0.25);
+--roadmap-edge-arrow: rgba(234, 231, 223, 0.4);
+--roadmap-grid-dot: rgba(234, 231, 223, 0.05);
+
+--roadmap-controls-bg: #242622;
+--roadmap-minimap-bg: #1E211D;
+--roadmap-mask: rgba(25, 26, 24, 0.75);
+--roadmap-active-shadow: rgba(199, 125, 90, 0.16);
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg-base:       #F7F6F0;
+  --bg-sidebar:    #EFEDE5;
+  --bg-card:       #FFFFFF;
+  --bg-elevated:   #F2F0E8;
+  --bg-input:      #FFFFFF;
+
+  --accent:        #926B0B;
+  --accent-dim:    rgba(201, 149, 33, 0.13);
+  --accent-border: rgba(146, 107, 11, 0.30);
+
+  --accent-2:      #647D8A;
+  --accent-2-dim:  rgba(100, 125, 138, 0.12);
+
+  --accent-green:     #64805A;
+  --accent-green-dim: rgba(100, 128, 90, 0.12);
+
+  --text-primary:   #292B25;
+  --text-secondary: #565B52;
+  --text-muted:     #73776F;
+
+  --border:        rgba(41, 43, 37, 0.12);
+  --border-active: rgba(177, 135, 25, 0.42);
+
+  --success: #64805A;
+  --warn:    #946A20;
+  --danger:  #B64C43;
+
+  --hero-graph-edge: rgba(41, 43, 37, 0.28);
+  /* Hero graph — light theme */
+--hero-graph-done: #64805A;
+--hero-graph-active: #926B0B;
+--hero-graph-locked: #A0A59D;
+--hero-graph-label: rgba(41, 43, 37, 0.60);
+--hero-graph-active-label: #926B0B;
+--hero-graph-inner-dot: #FFFFFF;
+
+/* Full roadmap — light theme */
+--roadmap-completed-bg: #EEF3EA;
+--roadmap-completed-border: rgba(100, 128, 90, 0.5);
+--roadmap-completed-text: #496843;
+
+--roadmap-progress-bg: #FBF3D8;
+--roadmap-progress-border: rgba(146, 107, 11, 0.55);
+--roadmap-progress-text: #79590A;
+
+--roadmap-locked-bg: #F0F1ED;
+--roadmap-locked-border: rgba(101, 125, 138, 0.3);
+--roadmap-locked-text: #65747A;
+
+--roadmap-edge: rgba(41, 43, 37, 0.25);
+--roadmap-edge-arrow: rgba(41, 43, 37, 0.42);
+--roadmap-grid-dot: rgba(41, 43, 37, 0.05);
+
+--roadmap-controls-bg: #FFFFFF;
+--roadmap-minimap-bg: #F0EEE5;
+--roadmap-mask: rgba(247, 246, 240, 0.75);
+--roadmap-active-shadow: rgba(146, 107, 11, 0.12);
 }
 
 /* ─── Reset ─────────────────────────────────────────────── */
@@ -74,10 +163,16 @@ body {
 ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
 /* ─── Typography ─────────────────────────────────────────── */
-h1,h2,h3,h4,h5,h6 {
-  font-family: 'Space Grotesk', 'Inter', sans-serif;
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: 'Manrope', 'Inter', sans-serif;
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
 }
 
 a { color: var(--accent); text-decoration: none; }

@@ -14,7 +14,7 @@ export const GOALS = [
     shortTitle: 'ML Engineer',
     description: 'Master supervised & unsupervised learning, neural networks, and model deployment pipelines.',
     icon: 'Brain',           // lucide icon name
-    accentColor: '#8B7CFF', // primary purple
+    accentColor: '#C77D5A', // primary purple
     bgToken: 'purple',
     tags: ['Python', 'Math', 'PyTorch'],
     courseCount: 12,
@@ -27,7 +27,7 @@ export const GOALS = [
     shortTitle: 'Full Stack Dev',
     description: 'Build end-to-end web applications with modern frameworks, REST APIs, and databases.',
     icon: 'Code2',
-    accentColor: '#59B8FF', // secondary blue
+   accentColor: '#AAB5BC', // secondary blue
     bgToken: 'blue',
     tags: ['JavaScript', 'React', 'Node.js'],
     courseCount: 10,
@@ -40,7 +40,7 @@ export const GOALS = [
     shortTitle: 'Placement Prep',
     description: 'Crack top product companies with focused DSA, system design, and core CS fundamentals.',
     icon: 'Trophy',
-    accentColor: '#52D9A4', // teal-green
+   accentColor: '#91A889', // teal-green
     bgToken: 'green',
     tags: ['DSA', 'C++', 'System Design'],
     courseCount: 9,

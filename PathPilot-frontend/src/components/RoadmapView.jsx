@@ -25,19 +25,19 @@ import { SAMPLE_GRAPHS } from '../data/courseData';
 // ── Colour config per node status ──────────────────────────
 const STATUS_STYLE = {
   completed: {
-    background: '#0E1D15',
-    border: '1.5px solid rgba(82,217,164,0.5)',
-    color: '#52D9A4',
+    background: 'var(--roadmap-completed-bg)',
+    border: '1.5px solid var(--roadmap-completed-border)',
+    color: 'var(--roadmap-completed-text)',
   },
   'in-progress': {
-    background: '#14132A',
-    border: '1.5px solid rgba(139,124,255,0.55)',
-    color: '#8B7CFF',
+    background: 'var(--roadmap-progress-bg)',
+    border: '1.5px solid var(--roadmap-progress-border)',
+    color: 'var(--roadmap-progress-text)',
   },
   locked: {
-    background: '#111827',
-    border: '1.5px solid rgba(255,255,255,0.07)',
-    color: '#55617A',
+    background: 'var(--roadmap-locked-bg)',
+    border: '1.5px solid var(--roadmap-locked-border)',
+    color: 'var(--roadmap-locked-text)',
   },
 };
 
@@ -82,16 +82,16 @@ function buildFlow(graphData) {
           </div>
         ),
       },
-      style: {
-        ...STATUS_STYLE[n.status],
-        borderRadius: 10,
-        padding: '8px 14px',
-        minWidth: 110,
-        fontFamily: 'Inter, sans-serif',
-        boxShadow: n.status === 'in-progress'
-          ? '0 0 14px rgba(139,124,255,0.2)'
-          : '0 2px 8px rgba(0,0,0,0.4)',
-      },
+  style: {
+  stroke: 'var(--roadmap-edge)',
+  strokeWidth: 1.5,
+},
+markerEnd: {
+  type: MarkerType.ArrowClosed,
+  color: 'var(--roadmap-edge-arrow)',
+  width: 14,
+  height: 14,
+},
     };
   });
 
@@ -162,26 +162,30 @@ export default function RoadmapView({ goalId, onSelectGoal }) {
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable={false}
-        colorMode="dark"
+        colorMode={document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'}
       >
-        <Background color="rgba(255,255,255,0.03)" gap={22} size={1} />
+        <Background
+  color="var(--roadmap-grid-dot)"
+  gap={22}
+  size={1}
+/>
         <Controls
           showInteractive={false}
-          style={{
-            background: '#19233A',
-            border: '1px solid rgba(255,255,255,0.07)',
-            borderRadius: 8,
-          }}
+style={{
+  background: 'var(--roadmap-controls-bg)',
+  border: '1px solid var(--border)',
+  borderRadius: 8,
+}}
         />
         <MiniMap
           nodeColor={n =>
             n.style?.color || '#55617A'
           }
-          style={{
-            background: '#0E1425',
-            border: '1px solid rgba(255,255,255,0.07)',
-          }}
-          maskColor="rgba(11,16,32,0.75)"
+      style={{
+  background: 'var(--roadmap-minimap-bg)',
+  border: '1px solid var(--border)',
+}}
+maskColor="var(--roadmap-mask)"
         />
       </ReactFlow>
     </div>
