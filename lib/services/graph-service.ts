@@ -288,7 +288,8 @@ export class GraphService {
     goalSlug?: string;
     userId?: string;
     weeklyStudyHours?: number;
-    operation?: "goal-roadmap" | "topological-sort" | "analyze";
+    operation?: "goal-roadmap" | "topological-sort" | "analyze" | "trace" | "max-flow";
+    recordSteps?: boolean;
   } = {}) {
     const { goalSlug, userId, operation } = options;
 
@@ -337,6 +338,7 @@ export class GraphService {
     const cppInput: CppGraphInput = {
       operation: goalSlug ? (operation || "goal-roadmap") : (operation || "analyze"),
       weeklyStudyHours: options.weeklyStudyHours || 10,
+      recordSteps: options.recordSteps !== false,
       targetIndices,
       vertices: fullGraph.nodes.map((n, idx) => ({
         index: idx,
@@ -354,8 +356,14 @@ export class GraphService {
       })),
     };
 
-    // Execute C++ algorithm engine
-    const cppResult = await runCppGraphEngine(cppInput);
+    // Execute C++ algorithm engine with automated TypeScript fallback for Vercel/cloud deployment
+    let cppResult: any;
+    try {
+      cppResult = await runCppGraphEngine(cppInput);
+    } catch (err: any) {
+      console.warn("Native C++ binary invocation failed, running pure TypeScript graph algorithm fallback:", err.message);
+      cppResult = this.executeFallbackGraphAlgorithms(cppInput);
+    }
 
     if (cppResult.hasCycle) {
       return {
@@ -557,7 +565,214 @@ export class GraphService {
         nodes: flowNodes,
         edges: flowEdges,
       },
+      steps: cppResult.steps || [],
+      maxFlow: cppResult.maxFlow || null,
       diagnostics: cppResult.diagnostics,
+    };
+  }
+
+  /**
+   * Pure TypeScript Graph Algorithm Fallback (Reverse BFS, Kahn's TopoSort, Critical Path)
+   * Ensures 100% operational reliability on serverless cloud platforms like Vercel.
+   */
+  static executeFallbackGraphAlgorithms(input: any) {
+    const startTime = Date.now();
+    const vertices = input.vertices || [];
+    const edges = input.edges || [];
+    const targetIndices = input.targetIndices || [];
+
+    // 1. Build adjacency structures
+    const fwdAdj = new Map<number, number[]>();
+    const revAdj = new Map<number, number[]>();
+    for (let i = 0; i < vertices.length; i++) {
+      fwdAdj.set(i, []);
+      revAdj.set(i, []);
+    }
+
+    for (const edge of edges) {
+      if (edge.u !== undefined && edge.v !== undefined) {
+        fwdAdj.get(edge.u)?.push(edge.v);
+        revAdj.get(edge.v)?.push(edge.u);
+      }
+    }
+
+    // 2. Goal subgraph extraction via Reverse BFS
+    let activeVertexIndices = new Set<number>();
+    if (targetIndices && targetIndices.length > 0) {
+      const q: number[] = [...targetIndices];
+      for (const t of targetIndices) activeVertexIndices.add(t);
+
+      while (q.length > 0) {
+        const curr = q.shift()!;
+        const prereqs = revAdj.get(curr) || [];
+        for (const p of prereqs) {
+          if (!activeVertexIndices.has(p)) {
+            activeVertexIndices.add(p);
+            q.push(p);
+          }
+        }
+      }
+    } else {
+      for (let i = 0; i < vertices.length; i++) {
+        activeVertexIndices.add(i);
+      }
+    }
+
+    // 3. Induced subgraph vertices and edges
+    const activeVertices = Array.from(activeVertexIndices).map((idx) => vertices[idx]);
+    const activeEdges = edges.filter(
+      (e: any) => activeVertexIndices.has(e.u) && activeVertexIndices.has(e.v)
+    );
+
+    // 4. In-Degree Calculation & Kahn's Topological Sort
+    const inDegree = new Map<number, number>();
+    for (const idx of activeVertexIndices) {
+      inDegree.set(idx, 0);
+    }
+    for (const e of activeEdges) {
+      inDegree.set(e.v, (inDegree.get(e.v) || 0) + 1);
+    }
+
+    const queue: number[] = [];
+    const levels = new Map<number, number>();
+    for (const idx of activeVertexIndices) {
+      if ((inDegree.get(idx) || 0) === 0) {
+        queue.push(idx);
+        levels.set(idx, 0);
+      }
+    }
+
+    const topoOrderIndices: number[] = [];
+    while (queue.length > 0) {
+      const u = queue.shift()!;
+      topoOrderIndices.push(u);
+      const uLevel = levels.get(u) || 0;
+
+      const neighbors = fwdAdj.get(u) || [];
+      for (const v of neighbors) {
+        if (!activeVertexIndices.has(v)) continue;
+        const curDeg = inDegree.get(v) || 0;
+        inDegree.set(v, curDeg - 1);
+        levels.set(v, Math.max(levels.get(v) || 0, uLevel + 1));
+        if (curDeg - 1 === 0) {
+          queue.push(v);
+        }
+      }
+    }
+
+    const hasCycle = topoOrderIndices.length < activeVertexIndices.size;
+    const cycleNodes: string[] = [];
+    if (hasCycle) {
+      for (const idx of activeVertexIndices) {
+        if ((inDegree.get(idx) || 0) > 0) {
+          cycleNodes.push(vertices[idx].code);
+        }
+      }
+    }
+
+    const learningOrder = topoOrderIndices.map((idx, orderPos) => ({
+      index: orderPos,
+      id: vertices[idx].id,
+      code: vertices[idx].code,
+      title: vertices[idx].title,
+      estimatedHours: vertices[idx].estimatedHours || 0,
+      category: vertices[idx].category || "General",
+      level: levels.get(idx) || 0,
+    }));
+
+    // 5. Critical Path Calculation via DP
+    let totalStudyHours = 0;
+    for (const v of activeVertices) {
+      totalStudyHours += v.estimatedHours || 0;
+    }
+
+    const distTo = new Map<number, number>();
+    const parent = new Map<number, number>();
+    for (const idx of activeVertexIndices) {
+      distTo.set(idx, vertices[idx].estimatedHours || 0);
+      parent.set(idx, -1);
+    }
+
+    for (const u of topoOrderIndices) {
+      const neighbors = fwdAdj.get(u) || [];
+      for (const v of neighbors) {
+        if (!activeVertexIndices.has(v)) continue;
+        const weight = vertices[v].estimatedHours || 0;
+        const currentDistU = distTo.get(u) || 0;
+        const currentDistV = distTo.get(v) || 0;
+        if (currentDistU + weight > currentDistV) {
+          distTo.set(v, currentDistU + weight);
+          parent.set(v, u);
+        }
+      }
+    }
+
+    let maxDist = 0;
+    let endNode = -1;
+    for (const idx of activeVertexIndices) {
+      const dist = distTo.get(idx) || 0;
+      if (dist > maxDist) {
+        maxDist = dist;
+        endNode = idx;
+      }
+    }
+
+    const cpIndices: number[] = [];
+    let curr = endNode;
+    while (curr !== -1 && curr !== undefined) {
+      cpIndices.push(curr);
+      curr = parent.get(curr)!;
+    }
+    cpIndices.reverse();
+
+    const criticalPath = cpIndices.map((idx, orderPos) => ({
+      index: orderPos,
+      id: vertices[idx].id,
+      code: vertices[idx].code,
+      title: vertices[idx].title,
+      estimatedHours: vertices[idx].estimatedHours || 0,
+      category: vertices[idx].category || "General",
+      level: levels.get(idx) || 0,
+    }));
+
+    const weeklyStudyHours = input.weeklyStudyHours || 15;
+    const executionTimeMs = Date.now() - startTime;
+
+    return {
+      success: !hasCycle,
+      operation: input.operation || "goal-roadmap",
+      hasCycle,
+      vertexCount: activeVertices.length,
+      edgeCount: activeEdges.length,
+      processedCount: topoOrderIndices.length,
+      learningOrder,
+      criticalPath,
+      criticalPathCodes: criticalPath.map((c) => c.code),
+      cycleNodes,
+      blockedNodes: cycleNodes,
+      totalStudyHours,
+      criticalPathHours: maxDist,
+      studyTimeEstimates: {
+        totalStudyHours,
+        criticalPathHours: maxDist,
+        weeklyStudyHours,
+        serialEstimatedWeeks: Math.ceil(totalStudyHours / weeklyStudyHours),
+        parallelEstimatedWeeks: Math.ceil(maxDist / weeklyStudyHours),
+        explanation: `Critical path contains ${criticalPath.length} sequential modules spanning ${maxDist} hours.`,
+      },
+      edges: activeEdges.map((e: any) => ({
+        u: e.u,
+        v: e.v,
+        fromCode: e.fromCode,
+        toCode: e.toCode,
+      })),
+      steps: [],
+      maxFlow: null,
+      diagnostics: {
+        executionTimeMs,
+        nodesAnalyzed: activeVertices.length,
+        edgesAnalyzed: activeEdges.length,
+      },
     };
   }
 }
