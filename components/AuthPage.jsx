@@ -16,8 +16,9 @@ import {
   Sparkles,
   UserRound,
 } from 'lucide-react';
+import ThemeToggle from './ThemeToggle';
 
-export default function AuthPage({ onAuthenticated }) {
+export default function AuthPage({ onAuthenticated, theme, onToggleTheme }) {
   const [mode, setMode] = useState('login');
 
   const [name, setName] = useState('');
@@ -72,7 +73,7 @@ export default function AuthPage({ onAuthenticated }) {
       <section className="auth-brand-panel">
         <div className="auth-brand-top">
           <div className="auth-logo-mark">
-            <GitBranch size={23} strokeWidth={2.2} />
+            <img src="/pathpilot-mark.png" alt="PathPilot logo" />
           </div>
 
           <div className="auth-brand-name">
@@ -189,10 +190,16 @@ export default function AuthPage({ onAuthenticated }) {
 
       {/* RIGHT: LOGIN / SIGN-UP FORM */}
       <section className="auth-main-panel">
+        <div className="auth-theme-control">
+          <ThemeToggle
+            theme={theme}
+            onToggle={onToggleTheme}
+          />
+        </div>
 
         <div className="auth-mobile-brand">
           <div className="auth-logo-mark">
-            <GitBranch size={22} />
+            <img src="/pathpilot-mark.png" alt="PathPilot logo" />
           </div>
           <span>PathPilot</span>
         </div>
@@ -359,6 +366,44 @@ export default function AuthPage({ onAuthenticated }) {
               <ArrowRight size={18} />
             </button>
 
+            {/* 1-Click Direct Demo Entry */}
+            <div style={{ margin: '16px 0 8px', textAlign: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '12px 0' }}>
+                <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+                <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  or explore without account
+                </span>
+                <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+              </div>
+
+              <button
+                type="button"
+                id="btn-demo-quick-entry"
+                onClick={() => onAuthenticated?.()}
+                style={{
+                  width: '100%',
+                  padding: '12px 18px',
+                  borderRadius: 10,
+                  background: 'var(--primary-soft)',
+                  border: '1.5px solid var(--primary)',
+                  color: 'var(--primary)',
+                  fontWeight: 700,
+                  fontSize: '0.92rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <Sparkles size={16} />
+                <span>Quick Student Demo (1-Click Direct Access)</span>
+                <ArrowRight size={16} />
+              </button>
+            </div>
+
             <div className="auth-mode-switch">
               <span>
                 {isSignup
@@ -380,8 +425,7 @@ export default function AuthPage({ onAuthenticated }) {
           <div className="auth-demo-note">
             <LockKeyhole size={14} />
             <span>
-              Demo mode: real account verification will be connected
-              when the backend is ready.
+              Demo mode: Click &quot;Quick Student Demo&quot; to test all graph algorithms and interactive roadmaps.
             </span>
           </div>
 

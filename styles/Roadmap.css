@@ -2,26 +2,27 @@
    PathPilot — Interactive Roadmap & Graph Visualization Styles
    ========================================================= */
 
-/* ─── Node in React Flow ─────────────────────────────────── */
+/* ─── Node in React Flow (P0-2 Fixed 240px × 92px) ────────── */
 .course-node {
-  background: #141C30;
-  border: 1.5px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 10px 14px;
-  width: 210px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 12px;
+  width: 240px;
+  min-height: 92px;
   box-sizing: border-box;
   font-family: 'Inter', system-ui, sans-serif;
-  color: #F4F6FF;
+  color: var(--text-primary);
   position: relative;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .course-node:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
-  border-color: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+  border-color: var(--border-active);
 }
 
 /* Edge rendering enhancements */
@@ -43,98 +44,217 @@
   }
 }
 
-/* Status variants */
+/* Status variants (P0-1 contrast compliant) */
 .course-node--completed {
-  background: #0D1E17;
-  border-color: rgba(82, 217, 164, 0.6);
+  background: var(--status-completed-bg);
+  border-color: var(--status-completed-border);
 }
 .course-node--completed:hover {
-  border-color: #52D9A4;
-  box-shadow: 0 0 16px rgba(82, 217, 164, 0.25);
+  border-color: var(--status-completed-text);
+  box-shadow: 0 0 14px rgba(46, 125, 91, 0.25);
 }
 
 .course-node--in-progress {
-  background: #16152E;
-  border-color: rgba(139, 124, 255, 0.65);
-  box-shadow: 0 0 16px rgba(139, 124, 255, 0.2);
+  background: var(--status-progress-bg);
+  border-color: var(--status-progress-border);
+  box-shadow: 0 0 12px rgba(37, 99, 235, 0.15);
 }
 .course-node--in-progress:hover {
-  border-color: #8B7CFF;
-  box-shadow: 0 0 22px rgba(139, 124, 255, 0.35);
+  border-color: var(--status-progress-text);
+  box-shadow: 0 0 18px rgba(37, 99, 235, 0.25);
 }
 
 .course-node--locked {
-  background: #0E1322;
-  border-color: rgba(255, 255, 255, 0.06);
-  opacity: 0.68;
+  background: var(--status-locked-bg);
+  border-color: var(--status-locked-border);
+  border-style: dashed;
+  opacity: 0.75;
 }
 .course-node--locked:hover {
-  opacity: 0.9;
-  border-color: rgba(255, 255, 255, 0.18);
+  opacity: 0.95;
+  border-color: var(--text-muted);
 }
 
-/* Selection & highlighting */
+/* Selection & BFS highlighting */
 .course-node--selected {
-  outline: 2.5px solid #F5A623 !important;
+  outline: 2.5px solid var(--primary, #8A5A00) !important;
   outline-offset: 3px;
-  border-color: #F5A623 !important;
-  box-shadow: 0 0 24px rgba(245, 166, 35, 0.55) !important;
+  border-color: var(--primary, #8A5A00) !important;
+  box-shadow: 0 0 20px rgba(138, 90, 0, 0.35) !important;
   opacity: 1 !important;
   z-index: 20 !important;
 }
 
 .course-node--ancestor {
-  outline: 2px solid #38BDF8 !important;
+  outline: 2px solid #2563EB !important;
   outline-offset: 2px;
-  border-color: #38BDF8 !important;
-  box-shadow: 0 0 20px rgba(56, 189, 248, 0.5) !important;
+  border-color: #2563EB !important;
+  box-shadow: 0 0 16px rgba(37, 99, 235, 0.3) !important;
   opacity: 1 !important;
   z-index: 15 !important;
 }
 
 .course-node--descendant {
-  outline: 2px solid #C084FC !important;
+  outline: 2px solid #8B5CF6 !important;
   outline-offset: 2px;
-  border-color: #C084FC !important;
-  box-shadow: 0 0 20px rgba(192, 132, 252, 0.5) !important;
+  border-color: #8B5CF6 !important;
+  box-shadow: 0 0 16px rgba(139, 92, 246, 0.3) !important;
   opacity: 1 !important;
   z-index: 15 !important;
 }
 
 .course-node--dimmed {
-  opacity: 0.18 !important;
-  filter: grayscale(75%);
-}
-
-.node-highlight-badge {
-  font-size: 0.56rem;
-  font-weight: 700;
-  padding: 1px 5px;
-  border-radius: 4px;
-  letter-spacing: 0.04em;
-}
-
-.node-highlight-badge--selected {
-  background: rgba(245, 166, 35, 0.25);
-  color: #F5A623;
-  border: 1px solid rgba(245, 166, 35, 0.5);
-}
-
-.node-highlight-badge--ancestor {
-  background: rgba(56, 189, 248, 0.25);
-  color: #38BDF8;
-  border: 1px solid rgba(56, 189, 248, 0.5);
-}
-
-.node-highlight-badge--descendant {
-  background: rgba(192, 132, 252, 0.25);
-  color: #C084FC;
-  border: 1px solid rgba(192, 132, 252, 0.5);
+  opacity: 0.22 !important;
+  filter: grayscale(70%);
 }
 
 /* Critical path outline */
 .course-node--critical:not(.course-node--completed) {
-  border-color: rgba(245, 166, 35, 0.8);
+  border-color: var(--accent, #5B5BD6);
+  box-shadow: 0 0 14px rgba(91, 91, 214, 0.25);
+}
+
+/* Node layout internal elements */
+.node-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.node-pills-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.node-pill-code {
+  font-family: monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+  background: var(--surface-2);
+  color: var(--text-primary);
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.node-pill-hours {
+  font-size: 0.65rem;
+  font-weight: 600;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  padding: 1px 4px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.node-pill-critical {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  background: rgba(183, 121, 31, 0.15);
+  color: var(--primary, #8A5A00);
+  padding: 1px 4px;
+  border-radius: 4px;
+  border: 1px solid rgba(183, 121, 31, 0.35);
+}
+
+.node-status-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.node-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+  margin: 2px 0 4px;
+  min-height: 34px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.node-category-sub {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.node-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.node-status-chip--completed {
+  background: var(--status-completed-bg);
+  color: var(--status-completed-text);
+  border: 1px solid var(--status-completed-border);
+}
+
+.node-status-chip--in-progress {
+  background: var(--status-progress-bg);
+  color: var(--status-progress-text);
+  border: 1px solid var(--status-progress-border);
+}
+
+.node-status-chip--locked {
+  background: var(--status-locked-bg);
+  color: var(--status-locked-text);
+  border: 1px solid var(--status-locked-border);
+}
+
+.node-algo-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.node-algo-badge.active {
+  background: #B7791F;
+  color: #FFFFFF;
+}
+.node-algo-badge.ready {
+  background: #2E7D5B;
+  color: #FFFFFF;
+}
+
+.node-role-badge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.node-role-badge.ancestor {
+  background: rgba(37, 99, 235, 0.15);
+  color: #2563EB;
+  border: 1px solid rgba(37, 99, 235, 0.4);
+}
+.node-role-badge.target {
+  background: rgba(183, 121, 31, 0.18);
+  color: #B7791F;
+  border: 1px solid rgba(183, 121, 31, 0.5);
+}
+.node-role-badge.unlocks {
+  background: rgba(139, 92, 246, 0.18);
+  color: #8B5CF6;
+  border: 1px solid rgba(139, 92, 246, 0.5);
 }
 
 /* Node internal elements */
@@ -242,9 +362,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 10px 14px;
-  background: #0E1425;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 10px 16px;
+  background: var(--roadmap-toolbar-bg);
+  border-bottom: 1px solid var(--border);
   font-size: 0.75rem;
 }
 
@@ -264,64 +384,67 @@
 .toolbar-input-wrap svg {
   position: absolute;
   left: 9px;
-  color: var(--text-muted, #55617A);
+  color: var(--text-muted);
 }
 
 .toolbar-input {
-  background: #141C30;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  color: var(--text-primary, #F4F6FF);
-  padding: 5px 10px 5px 28px;
-  font-size: 0.75rem;
-  width: 170px;
+  color: var(--text-primary);
+  padding: 6px 10px 6px 30px;
+  font-size: 0.76rem;
+  width: 180px;
   transition: all 0.2s;
 }
 
 .toolbar-input:focus {
-  border-color: var(--accent, #8B7CFF);
-  box-shadow: 0 0 0 2px rgba(139, 124, 255, 0.2);
-  width: 200px;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-dim);
+  width: 210px;
+  outline: none;
 }
 
 .toolbar-select {
-  background: #141C30;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  color: var(--text-secondary, #929DB5);
-  padding: 5px 8px;
-  font-size: 0.73rem;
+  color: var(--text-primary);
+  padding: 6px 10px;
+  font-size: 0.75rem;
   cursor: pointer;
 }
 
 .toolbar-select:focus {
-  border-color: var(--accent, #8B7CFF);
+  border-color: var(--accent);
   outline: none;
 }
 
 .toolbar-btn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  background: #141C30;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: var(--text-secondary, #929DB5);
-  padding: 5px 10px;
+  gap: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 6px 12px;
   border-radius: 6px;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .toolbar-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text-primary, #F4F6FF);
+  background: var(--surface-2);
+  border-color: var(--border-active);
+  color: var(--text-primary);
 }
 
 .toolbar-btn--active {
-  background: rgba(139, 124, 255, 0.15);
-  border-color: rgba(139, 124, 255, 0.4);
-  color: var(--accent, #8B7CFF);
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* ─── Metrics and Insights Bar ────────────────────────────── */

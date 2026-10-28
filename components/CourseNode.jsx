@@ -2,12 +2,39 @@
 
 import React, { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
-import { CheckCircle2, PlayCircle, Lock } from 'lucide-react';
+import { CheckCircle2, PlayCircle, Lock, Zap } from 'lucide-react';
+
+const CATEGORY_COLORS = {
+  'Foundations': '#8B5CF6',
+  'Mathematics': '#6366F1',
+  'Core CS': '#0EA5E9',
+  'Programming': '#0284C7',
+  'Machine Learning': '#9333EA',
+  'Deep Learning': '#C026D3',
+  'Web Development': '#10B981',
+  'Frontend': '#059669',
+  'Backend': '#D97706',
+  'Database': '#EA580C',
+  'Interview Prep': '#F59E0B',
+};
+
+function getCategoryColor(cat) {
+  if (!cat) return '#8A5A00';
+  for (const [key, color] of Object.entries(CATEGORY_COLORS)) {
+    if (cat.toLowerCase().includes(key.toLowerCase())) return color;
+  }
+  return '#8A5A00';
+}
 
 /**
- * CourseNode — Custom React Flow Node for PathPilot DAG
- * Features handles on left (target) and right (source) for clean left-to-right DAG layout.
- * Visualizes status, critical path flag, hours, level, category, and interaction states.
+ * CourseNode — P0-2 Readable & Polished React Flow Node
+ * Fixed dimensions: 240px × 92px
+ * Features:
+ * - 14px/600 title (2 lines max with clean ellipsis)
+ * - Module code & hours as small pills on ONE row
+ * - Status badge top-right with zero overlap
+ * - Left colored border for category identification
+ * - Handles for clean LR prerequisite routing
  */
 function CourseNode({ id, data, selected }) {
   const {
@@ -22,6 +49,8 @@ function CourseNode({ id, data, selected }) {
     isDimmed = false,
   } = data || {};
 
+  const catColor = getCategoryColor(category);
+
   const statusCls = `course-node--${status}`;
   const highlightCls = highlightRole ? `course-node--${highlightRole}` : '';
   const criticalCls = isCritical ? 'course-node--critical' : '';
@@ -32,7 +61,11 @@ function CourseNode({ id, data, selected }) {
     <div
       className={`course-node ${statusCls} ${highlightCls} ${criticalCls} ${dimmedCls} ${selectedCls}`}
       id={`flow-node-${code}`}
-      title={`${code}: ${title} (${estimatedHours}h)`}
+      title={`${code}: ${title} (${estimatedHours}h, ${category || 'General'})`}
+      style={{
+        borderLeftColor: catColor,
+        borderLeftWidth: 4,
+      }}
     >
       {/* Target handle on left for incoming prerequisite edges */}
       <Handle
@@ -40,79 +73,87 @@ function CourseNode({ id, data, selected }) {
         position={Position.Left}
         id="in"
         style={{
-          background: '#38BDF8',
-          width: 9,
-          height: 9,
-          border: '2px solid #0B1020',
+          background: 'var(--accent, #5B5BD6)',
+          width: 8,
+          height: 8,
+          border: '2px solid var(--bg-card)',
         }}
       />
 
-      {/* Header: Code + CP badge + Hours */}
-      <div className="node-header">
-        <span className="node-code">{code}</span>
-        <div className="node-badges">
-          {highlightRole === 'ancestor' && (
-            <span
-              className="node-highlight-badge node-highlight-badge--ancestor"
-              title="Prerequisite ancestor course required to unlock selected target"
-            >
+      {/* Row 1: Code + Hours pills on Left, Status Badge on Right */}
+      <div className="node-top-row">
+        <div className="node-pills-group">
+          <span className="node-pill-code">{code}</span>
+          <span className="node-pill-hours">{estimatedHours}h</span>
+          {isCritical && (
+            <span className="node-pill-critical" title="On Critical Path (bottleneck module)">
+              <Zap size={9} />
+              CP
+            </span>
+          )}
+        </div>
+
+        <div className="node-status-wrap">
+          {data?.isAlgoActive && (
+            <span className="node-algo-badge active">ACTIVE ⚡</span>
+          )}
+          {data?.isAlgoQueued && !data?.isAlgoActive && (
+            <span className="node-algo-badge ready">READY 📥</span>
+          )}
+
+          {highlightRole === 'ancestor' && !data?.isAlgoQueued && (
+            <span className="node-role-badge ancestor" title="Prerequisite needed for selected course">
               PREREQ
             </span>
           )}
-          {highlightRole === 'selected' && (
-            <span
-              className="node-highlight-badge node-highlight-badge--selected"
-              title="Currently selected target course"
-            >
+          {highlightRole === 'selected' && !data?.isAlgoActive && (
+            <span className="node-role-badge target" title="Selected module">
               TARGET
             </span>
           )}
           {highlightRole === 'descendant' && (
-            <span
-              className="node-highlight-badge node-highlight-badge--descendant"
-              title="Downstream course unlocked by this course"
-            >
+            <span className="node-role-badge unlocks" title="Unlocked by this module">
               UNLOCKS
             </span>
           )}
-          {isCritical && (
-            <span className="node-cp-badge" title="Course is on the Critical Path bottleneck">
-              CP
-            </span>
+
+          {!highlightRole && !data?.isAlgoActive && !data?.isAlgoQueued && (
+            <>
+              {status === 'completed' && (
+                <span className="node-status-chip node-status-chip--completed">
+                  <CheckCircle2 size={11} strokeWidth={2.4} />
+                  Done
+                </span>
+              )}
+              {status === 'in-progress' && (
+                <span className="node-status-chip node-status-chip--in-progress">
+                  <PlayCircle size={11} strokeWidth={2.4} />
+                  Ready
+                </span>
+              )}
+              {status === 'locked' && (
+                <span className="node-status-chip node-status-chip--locked">
+                  <Lock size={10} strokeWidth={2.2} />
+                  Locked
+                </span>
+              )}
+            </>
           )}
-          <span className="node-hours-badge">{estimatedHours}h</span>
         </div>
       </div>
 
-      {/* Title */}
-      <div className="node-title">{title}</div>
+      {/* Row 2: Human-Readable Module Title (14px/600, 2 lines max) */}
+      <div
+        className="node-title"
+        title={title}
+      >
+        {title || code}
+      </div>
 
-      {/* Footer: Level & Category + Status icon */}
-      <div className="node-footer">
-        <span className="node-meta" title={category}>
-          L{level} • {category}
-        </span>
-
-        {status === 'completed' && (
-          <span className="node-status-chip node-status-chip--completed">
-            <CheckCircle2 size={10} strokeWidth={2.5} />
-            Done
-          </span>
-        )}
-
-        {status === 'in-progress' && (
-          <span className="node-status-chip node-status-chip--in-progress">
-            <PlayCircle size={10} strokeWidth={2.5} />
-            Ready
-          </span>
-        )}
-
-        {status === 'locked' && (
-          <span className="node-status-chip node-status-chip--locked">
-            <Lock size={10} strokeWidth={2.5} />
-            Locked
-          </span>
-        )}
+      {/* Row 3: Category subtitle pill */}
+      <div className="node-category-sub">
+        <span style={{ color: catColor }}>●</span>
+        <span>{category || 'Core Curriculum'}</span>
       </div>
 
       {/* Source handle on right for outgoing prerequisite edges */}
@@ -121,10 +162,10 @@ function CourseNode({ id, data, selected }) {
         position={Position.Right}
         id="out"
         style={{
-          background: '#8B7CFF',
-          width: 9,
-          height: 9,
-          border: '2px solid #0B1020',
+          background: 'var(--accent, #5B5BD6)',
+          width: 8,
+          height: 8,
+          border: '2px solid var(--bg-card)',
         }}
       />
     </div>

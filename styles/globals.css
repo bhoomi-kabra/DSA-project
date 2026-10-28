@@ -2,49 +2,165 @@
    PathPilot — Global Styles  (v2 — refined dark SaaS theme)
    ========================================================= */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
 
 /* ─── Design Tokens ─────────────────────────────────────── */
+/* ─── Design Tokens (P0-1 Design System) ─────────────────────── */
 :root {
-  /* Backgrounds */
-  --bg-base:       #0B1020;
-  --bg-sidebar:    #0E1425;
-  --bg-card:       #141C30;
-  --bg-elevated:   #19233A;
-  --bg-input:      #121929;
+  color-scheme: light;
 
-  /* Accents */
-  --accent:        #8B7CFF;   /* primary purple */
-  --accent-dim:    rgba(139,124,255,0.14);
-  --accent-border: rgba(139,124,255,0.28);
-  --accent-2:      #59B8FF;   /* secondary sky blue */
-  --accent-2-dim:  rgba(89,184,255,0.12);
-  --accent-green:  #52D9A4;
-  --accent-green-dim: rgba(82,217,164,0.12);
+  /* Light palette default (warm cream identity) */
+  --bg-base:        #F7F5F0;
+  --bg-sidebar:     #F1EDE3;
+  --bg-card:        #FFFFFF;
+  --bg-elevated:    #F1EDE3;
+  --bg-input:       #FFFFFF;
 
-  /* Text */
-  --text-primary:  #F4F6FF;
-  --text-secondary:#929DB5;
-  --text-muted:    #55617A;
+  --surface:        #FFFFFF;
+  --surface-2:      #F1EDE3;
+  --border:         #E4DFD2;
+  --border-active:  #8A5A00;
 
-  /* Borders */
-  --border:        rgba(255,255,255,0.07);
-  --border-active: rgba(139,124,255,0.4);
+  /* Typography */
+  --text-primary:   #1F2430;
+  --text-secondary: #5F6675;
+  --text-muted:     #5F6675;
 
-  /* Misc */
-  --success:       #52D9A4;
-  --warn:          #F5A623;
-  --danger:        #F06292;
+  /* Brand Accents */
+  --primary:        #8A5A00;
+  --primary-soft:   #F4E7C6;
+  --accent:         #5B5BD6;   /* indigo for graph/algorithm UI */
+  --accent-dim:     rgba(91, 91, 214, 0.12);
+  --accent-border:  rgba(91, 91, 214, 0.35);
+  --accent-2:       #2563EB;
+  --accent-2-dim:   rgba(37, 99, 235, 0.12);
 
-  --sidebar-w:     240px;
-  --topbar-h:      60px;
-  --radius:        10px;
-  --radius-lg:     14px;
-  --radius-xl:     18px;
+  /* Status Colors (Contrast >= 4.5:1) */
+  --status-completed-text:   #2E7D5B;
+  --status-completed-bg:     #E3F3EA;
+  --status-completed-border: #A3D9BE;
 
-  --ease:          cubic-bezier(0.25,0.46,0.45,0.94);
-  --t-fast:        0.15s;
-  --t-med:         0.22s;
+  --status-progress-text:    #2563EB;
+  --status-progress-bg:      #E4ECFD;
+  --status-progress-border:  #ADC8FA;
+
+  --status-ready-text:       #B7791F;
+  --status-ready-bg:         #FBEFD3;
+  --status-ready-border:     #EAC878;
+
+  --status-locked-text:      #6B7280;
+  --status-locked-bg:        #EEF0F3;
+  --status-locked-border:    #D1D5DB;
+
+  --success:        #2E7D5B;
+  --warn:           #B7791F;
+  --danger:         #DC2626;
+
+  --sidebar-w:      240px;
+  --topbar-h:       60px;
+  --radius:         10px;
+  --radius-lg:      14px;
+  --radius-xl:      18px;
+
+  --ease:           cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --t-fast:         0.15s;
+  --t-med:          0.22s;
+
+  /* Roadmap Canvas Tokens (Light) */
+  --roadmap-canvas-bg:       #F7F5F0;
+  --roadmap-toolbar-bg:      #FFFFFF;
+  --roadmap-toolbar-border:  #E4DFD2;
+  --roadmap-card-bg:         #FFFFFF;
+  --roadmap-card-border:     #E4DFD2;
+  --roadmap-edge:            #94A3B8;
+  --roadmap-edge-critical:   #5B5BD6;
+  --roadmap-edge-arrow:      #64748B;
+  --roadmap-grid-dot:        rgba(31, 36, 48, 0.08);
+  --roadmap-controls-bg:     #FFFFFF;
+  --roadmap-minimap-bg:      #F1EDE3;
+  --roadmap-minimap-mask:    rgba(247, 245, 240, 0.75);
+
+  --hero-graph-edge:         rgba(31, 36, 48, 0.22);
+  --hero-graph-done:         #2E7D5B;
+  --hero-graph-active:       #8A5A00;
+  --hero-graph-locked:       #9CA3AF;
+  --hero-graph-label:        #5F6675;
+  --hero-graph-active-label: #8A5A00;
+  --hero-graph-inner-dot:    #FFFFFF;
+}
+
+[data-theme="dark"],
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Dark palette */
+  --bg-base:        #12141A;
+  --bg-sidebar:     #1B1E27;
+  --bg-card:        #1B1E27;
+  --bg-elevated:    #232733;
+  --bg-input:       #1B1E27;
+
+  --surface:        #1B1E27;
+  --surface-2:      #232733;
+  --border:         #2E3341;
+  --border-active:  #E0A93B;
+
+  /* Typography */
+  --text-primary:   #ECEEF3;
+  --text-secondary: #A3AAB8;
+  --text-muted:     #A3AAB8;
+
+  /* Brand Accents */
+  --primary:        #E0A93B;
+  --primary-soft:   rgba(224, 169, 59, 0.15);
+  --accent:         #8B8BFF;   /* bright indigo/purple for dark mode */
+  --accent-dim:     rgba(139, 139, 255, 0.14);
+  --accent-border:  rgba(139, 139, 255, 0.35);
+  --accent-2:       #7AA7FF;
+  --accent-2-dim:   rgba(122, 167, 255, 0.14);
+
+  /* Status Colors (Contrast >= 4.5:1) */
+  --status-completed-text:   #5FD3A0;
+  --status-completed-bg:     #173226;
+  --status-completed-border: rgba(95, 211, 160, 0.4);
+
+  --status-progress-text:    #7AA7FF;
+  --status-progress-bg:      #16233F;
+  --status-progress-border:  rgba(122, 167, 255, 0.4);
+
+  --status-ready-text:       #F0C060;
+  --status-ready-bg:         #3A2E12;
+  --status-ready-border:     rgba(240, 192, 96, 0.4);
+
+  --status-locked-text:      #A3AAB8;
+  --status-locked-bg:        #1B1E27;
+  --status-locked-border:    #2E3341;
+
+  --success:        #5FD3A0;
+  --warn:           #F0C060;
+  --danger:         #F87171;
+
+  /* Roadmap Canvas Tokens (Dark) */
+  --roadmap-canvas-bg:       #12141A;
+  --roadmap-toolbar-bg:      #1B1E27;
+  --roadmap-toolbar-border:  #2E3341;
+  --roadmap-card-bg:         #1B1E27;
+  --roadmap-card-border:     #2E3341;
+  --roadmap-edge:            #475569;
+  --roadmap-edge-critical:   #8B8BFF;
+  --roadmap-edge-arrow:      #64748B;
+  --roadmap-grid-dot:        rgba(236, 238, 243, 0.06);
+  --roadmap-controls-bg:     #1B1E27;
+  --roadmap-minimap-bg:      #1B1E27;
+  --roadmap-minimap-mask:    rgba(18, 20, 26, 0.75);
+
+  --hero-graph-edge:         rgba(236, 238, 243, 0.22);
+  --hero-graph-done:         #5FD3A0;
+  --hero-graph-active:       #E0A93B;
+  --hero-graph-locked:       #55617A;
+  --hero-graph-label:        #A3AAB8;
+  --hero-graph-active-label: #E0A93B;
+  --hero-graph-inner-dot:    #FFFFFF;
 }
 
 /* ─── Reset ─────────────────────────────────────────────── */

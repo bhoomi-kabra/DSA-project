@@ -37,11 +37,18 @@ import {
   HelpCircle,
   X,
   Info,
+  Activity,
+  Cpu,
+  ZoomIn,
+  ZoomOut,
+  Calendar,
 } from 'lucide-react';
 
 import CourseNode from './CourseNode';
 import CourseDetailsDrawer from './CourseDetailsDrawer';
 import RecommendedCoursesTray from './RecommendedCoursesTray';
+import AlgorithmVisualizerModal from './AlgorithmVisualizerModal';
+import CognitiveFlowModal from './CognitiveFlowModal';
 import { GOALS, GOAL_SLUG_MAP } from '../data/courseData';
 import dagre from '@dagrejs/dagre';
 
@@ -49,8 +56,8 @@ const NODE_TYPES = {
   courseNode: CourseNode,
 };
 
-const DAGRE_NODE_WIDTH = 220;
-const DAGRE_NODE_HEIGHT = 100;
+const DAGRE_NODE_WIDTH = 240;
+const DAGRE_NODE_HEIGHT = 92;
 
 // ── Main Component ─────────────────────────────────────────
 export default function RoadmapView({
@@ -78,18 +85,25 @@ export default function RoadmapView({
   const [selectedCourseCode, setSelectedCourseCode] = useState(initialSelectedCourseCode);
   const [highlightMode, setHighlightMode] = useState(null); // 'ancestors' | 'descendants' | null
 
+  // Interactive Algorithm Inspector & Cognitive Capacity Max-Flow States
+  const [showAlgoInspector, setShowAlgoInspector] = useState(false);
+  const [showCapacityPlanner, setShowCapacityPlanner] = useState(false);
+  const [activeStep, setActiveStep] = useState(null);
+
   // Resolve database goal slug from ID
   const targetGoalSlug = goalId ? (GOAL_SLUG_MAP[goalId] || goalId) : null;
 
   // ── Fetch algorithm results from C++ Engine ──────────────
-  const fetchCppRoadmap = useCallback(async (slug, pace = weeklyStudyHours) => {
+  const fetchCppRoadmap = useCallback(async (slug, pace = weeklyStudyHours, isSilent = false) => {
     if (!slug) {
       setCppResult(null);
       setError(null);
       return;
     }
 
-    setLoading(true);
+    if (!isSilent) {
+      setLoading(true);
+    }
     setError(null);
 
     try {
@@ -131,7 +145,9 @@ export default function RoadmapView({
       });
       setCppResult(null);
     } finally {
-      setLoading(false);
+      if (!isSilent) {
+        setLoading(false);
+      }
     }
   }, [weeklyStudyHours]);
 
@@ -305,8 +321,7 @@ export default function RoadmapView({
   }, [selectedCourseCode, rawEdges, cppResult]);
 
   // ── Compute Stable Graph Layout via Dagre ─────────────────
-  // Calculates optimal Sugiyama layered DAG positions with crossing reduction
-  // and horizontal/vertical spacing so edges never overlap or cut through nodes.
+  // Uses balanced Sugiyama layered DAG layout without artificial rank inflation
   const layoutPositions = useMemo(() => {
     if (!cppResult?.learningOrder || cppResult.learningOrder.length === 0) {
       return new Map();
@@ -315,12 +330,11 @@ export default function RoadmapView({
     const g = new dagre.graphlib.Graph();
     g.setGraph({
       rankdir: 'LR',
-      align: 'UL',
-      nodesep: 55, // Clean vertical clearance between parallel courses
-      ranksep: 100, // Wide horizontal clearance channel for routing edges
-      edgesep: 25, // Separation between parallel routed edges
-      marginx: 50,
-      marginy: 50,
+      nodesep: 40,  // Clean vertical clearance
+      ranksep: 110, // P0-2 standard spacing between prerequisite ranks
+      edgesep: 25,
+      marginx: 40,
+      marginy: 40,
     });
     g.setDefaultEdgeLabel(() => ({}));
 
@@ -332,13 +346,12 @@ export default function RoadmapView({
       });
     });
 
-    // Register directed prerequisite edges
+    // Register directed prerequisite edges with minlen = 1 (clean topological tiers)
     rawEdges.forEach((e) => {
       const fromNode = cppResult.learningOrder.find((n) => n.code === e.fromCode);
       const toNode = cppResult.learningOrder.find((n) => n.code === e.toCode);
       if (fromNode && toNode) {
-        const minlen = Math.max(1, (toNode.level ?? 0) - (fromNode.level ?? 0));
-        g.setEdge(fromNode.id, toNode.id, { minlen });
+        g.setEdge(fromNode.id, toNode.id, { minlen: 1 });
       }
     });
 
@@ -405,18 +418,41 @@ export default function RoadmapView({
         isDimmed = true;
       }
 
+      // Live Step Highlight during Algorithm Inspector playback
+      let isAlgoActive = false;
+      let isAlgoTarget = false;
+      let isAlgoQueued = false;
+      if (activeStep) {
+        if (activeStep.activeNodeCode === course.code) {
+          isAlgoActive = true;
+          highlightRole = 'selected';
+          isDimmed = false;
+        } else if (activeStep.targetNodeCode === course.code) {
+          isAlgoTarget = true;
+          highlightRole = 'descendant';
+          isDimmed = false;
+        } else if (activeStep.queueState?.includes(course.code)) {
+          isAlgoQueued = true;
+          highlightRole = 'ancestor';
+          isDimmed = false;
+        }
+      }
+
       const pos = layoutPositions.get(course.id) || { x: 0, y: 0 };
 
       return {
         id: course.id,
         type: 'courseNode',
         position: pos,
-        selected: isSelected,
+        selected: isSelected || isAlgoActive,
         data: {
           ...course,
           isCritical: criticalPathSet.has(course.code),
           highlightRole,
           isDimmed,
+          isAlgoActive,
+          isAlgoTarget,
+          isAlgoQueued,
         },
       };
     });
@@ -430,6 +466,7 @@ export default function RoadmapView({
     searchQuery,
     statusFilter,
     categoryFilter,
+    activeStep,
   ]);
 
   // ── Generate Directed Edges with Bold Arrowheads and Clean Routing ───
@@ -463,21 +500,21 @@ export default function RoadmapView({
         (descendantCodes.has(e.fromCode) || e.fromCode === selectedCourseCode) &&
         descendantCodes.has(e.toCode);
 
-      // Default high-contrast slate edge styling against dark background
-      let strokeColor = '#64748B';
-      let strokeWidth = 2;
+      // Default high-contrast edge styling respecting light & dark theme
+      let strokeColor = 'var(--roadmap-edge, #94A3B8)';
+      let strokeWidth = 1.5;
       let animated = false;
-      let markerColor = '#64748B';
-      let markerSize = 18;
+      let markerColor = 'var(--roadmap-edge-arrow, #64748B)';
+      let markerSize = 16;
       let zIndex = 2;
 
       if (isCriticalEdge) {
-        strokeColor = '#F5A623';
+        strokeColor = 'var(--roadmap-edge-critical, #5B5BD6)';
         strokeWidth = 2.5;
         animated = true;
-        markerColor = '#F5A623';
-        markerSize = 20;
-        zIndex = 3;
+        markerColor = 'var(--roadmap-edge-critical, #5B5BD6)';
+        markerSize = 18;
+        zIndex = 5;
       }
 
       if (highlightMode === 'ancestors') {
@@ -557,13 +594,18 @@ export default function RoadmapView({
     setEdges(flowEdges);
   }, [flowNodes, flowEdges, setNodes, setEdges]);
 
-  // Auto-fit viewport smoothly when a new goal/roadmap is loaded
+  const lastFittedGoalRef = useRef(null);
+
+  // Auto-fit viewport only when a new goal/roadmap is loaded, not on every state change
   useEffect(() => {
     if (reactFlowInstance && layoutPositions.size > 0) {
-      const timer = setTimeout(() => {
-        reactFlowInstance.fitView({ padding: 0.18, duration: 450 });
-      }, 60);
-      return () => clearTimeout(timer);
+      if (lastFittedGoalRef.current !== targetGoalSlug) {
+        lastFittedGoalRef.current = targetGoalSlug;
+        const timer = setTimeout(() => {
+          reactFlowInstance.fitView({ padding: 0.16, minZoom: 0.65, maxZoom: 1.05, duration: 400 });
+        }, 80);
+        return () => clearTimeout(timer);
+      }
     }
   }, [reactFlowInstance, targetGoalSlug, layoutPositions]);
 
@@ -581,13 +623,31 @@ export default function RoadmapView({
     if (reactFlowInstance) {
       const node = nodes.find((n) => n.data?.code === code);
       if (node) {
-        reactFlowInstance.setCenter(node.position.x + 105, node.position.y + 49, {
-          zoom: 1.1,
-          duration: 600,
+        reactFlowInstance.setCenter(node.position.x + 105, node.position.y + 44, {
+          zoom: Math.max(0.9, reactFlowInstance.getZoom()),
+          duration: 500,
         });
       }
     }
   }, [reactFlowInstance, nodes]);
+
+  const handleFitView = useCallback(() => {
+    if (reactFlowInstance) {
+      reactFlowInstance.fitView({ padding: 0.16, minZoom: 0.65, maxZoom: 1.05, duration: 350 });
+    }
+  }, [reactFlowInstance]);
+
+  const handleZoomIn = useCallback(() => {
+    if (reactFlowInstance) {
+      reactFlowInstance.zoomIn({ duration: 250 });
+    }
+  }, [reactFlowInstance]);
+
+  const handleZoomOut = useCallback(() => {
+    if (reactFlowInstance) {
+      reactFlowInstance.zoomOut({ duration: 250 });
+    }
+  }, [reactFlowInstance]);
 
   // ── Highlight Ancestors Action with Clear User Guidance ───
   const handleToggleHighlightAncestors = useCallback(() => {
@@ -603,12 +663,6 @@ export default function RoadmapView({
     setHighlightNotice(null);
     setHighlightMode((prev) => (prev === 'ancestors' ? null : 'ancestors'));
   }, [selectedCourseCode, ancestorCodes]);
-
-  const handleFitView = useCallback(() => {
-    if (reactFlowInstance) {
-      reactFlowInstance.fitView({ padding: 0.18, duration: 400 });
-    }
-  }, [reactFlowInstance]);
 
   const handleResetFilters = useCallback(() => {
     setSearchQuery('');
@@ -643,9 +697,86 @@ export default function RoadmapView({
     );
   }
 
+  // ── Summary Bar Metrics (P0-2) ─────────────────────────────
+  const summaryMetrics = useMemo(() => {
+    if (!cppResult?.learningOrder || cppResult.learningOrder.length === 0) {
+      return null;
+    }
+    const courses = cppResult.learningOrder;
+    const totalHours = courses.reduce((acc, c) => acc + (c.estimatedHours || 0), 0);
+    const completedCourses = courses.filter((c) => c.status === 'completed');
+    const completedHours = completedCourses.reduce((acc, c) => acc + (c.estimatedHours || 0), 0);
+    const remainingHours = Math.max(0, totalHours - completedHours);
+    const criticalHours = cppResult.criticalPathHours || 0;
+    const pace = weeklyStudyHours || 10;
+    const weeks = pace > 0 ? Math.ceil(remainingHours / pace) : 0;
+    const finishDate = new Date();
+    finishDate.setDate(finishDate.getDate() + weeks * 7);
+    const finishDateStr = finishDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+    return {
+      totalHours,
+      completedHours,
+      remainingHours,
+      criticalHours,
+      finishDateStr,
+      weeks,
+    };
+  }, [cppResult, weeklyStudyHours]);
+
   return (
     <div style={{ width: '100%', position: 'relative' }}>
-      {/* ── Mode & Algorithm Status Bar ───────────────────── */}
+      {/* ── Summary Bar Above Graph (P0-2) ─────────────────── */}
+      {summaryMetrics && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 12,
+            padding: '12px 18px',
+            marginBottom: 10,
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border)',
+            borderRadius: 10,
+            fontSize: '0.82rem',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Clock size={15} style={{ color: 'var(--accent)' }} />
+              <span style={{ color: 'var(--text-secondary)' }}>Total:</span>
+              <strong style={{ color: 'var(--text-primary)' }}>{summaryMetrics.totalHours}h</strong>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ color: 'var(--success)', fontWeight: 700 }}>✓</span>
+              <span style={{ color: 'var(--text-secondary)' }}>Completed:</span>
+              <strong style={{ color: 'var(--success)' }}>{summaryMetrics.completedHours}h</strong>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ color: 'var(--text-secondary)' }}>Remaining:</span>
+              <strong style={{ color: 'var(--primary)' }}>{summaryMetrics.remainingHours}h</strong>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Zap size={14} style={{ color: 'var(--accent)' }} />
+              <span style={{ color: 'var(--text-secondary)' }}>Critical Path:</span>
+              <strong style={{ color: 'var(--accent)' }}>{summaryMetrics.criticalHours}h</strong>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Calendar size={14} style={{ color: 'var(--text-secondary)' }} />
+            <span style={{ color: 'var(--text-secondary)' }}>Est. Finish ({weeklyStudyHours || 10}h/wk):</span>
+            <strong style={{ color: 'var(--text-primary)' }}>{summaryMetrics.finishDateStr} ({summaryMetrics.weeks} wks)</strong>
+          </div>
+        </div>
+      )}
+
+      {/* ── Single Unified Streamlined Toolbar ──────────────── */}
       <div
         style={{
           display: 'flex',
@@ -653,170 +784,149 @@ export default function RoadmapView({
           alignItems: 'center',
           flexWrap: 'wrap',
           gap: 10,
-          padding: '8px 14px',
-          background: 'rgba(17, 24, 39, 0.75)',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
-          borderRadius: '10px 10px 0 0',
-          fontSize: '0.78rem',
+          padding: '10px 16px',
+          background: 'var(--roadmap-toolbar-bg)',
+          border: '1px solid var(--border)',
+          borderTopLeftRadius: 10,
+          borderTopRightRadius: 10,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 5,
-              padding: '3px 8px',
-              borderRadius: 6,
-              background: 'rgba(82,217,164,0.15)',
-              color: '#52D9A4',
-              fontWeight: 600,
-            }}
-          >
-            <Zap size={13} />
-            C++ Graph Engine Active
-          </span>
-
-          {cppResult?.diagnostics && (
-            <span style={{ color: '#8A99B5', fontSize: '0.72rem' }}>
-              ⚡ Computed in {cppResult.diagnostics.executionTimeMs.toFixed(2)}ms &bull;{' '}
-              {cppResult.learningOrder?.length || 0} courses &bull;{' '}
-              {rawEdges.length} prerequisite dependencies
-            </span>
-          )}
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button
-            type="button"
-            className="btn btn-ghost"
-            style={{ fontSize: '0.72rem', padding: '4px 8px' }}
-            title="Re-run C++ Graph Engine"
-            onClick={() => fetchCppRoadmap(targetGoalSlug, weeklyStudyHours)}
-            disabled={loading}
-          >
-            <RefreshCw size={12} className={loading ? 'anim-spin' : ''} />
-            <span style={{ marginLeft: 4 }}>Recalculate</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ── Controls & Filter Toolbar ─────────────────────── */}
-      <div className="graph-toolbar">
-        {/* Search & Filters */}
-        <div className="toolbar-group">
-          {/* Search box */}
-          <div className="toolbar-input-wrap">
+        {/* Left: Search & Filter */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <div className="toolbar-input-wrap" style={{ minWidth: 200 }}>
             <Search size={13} />
             <input
               type="text"
               className="toolbar-input"
-              placeholder="Search course or code..."
+              placeholder="Search course title..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
 
-          {/* Status filter */}
           <select
             className="toolbar-select"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             title="Filter by status"
           >
-            <option value="all">All Statuses</option>
-            <option value="ready">Ready to Study</option>
+            <option value="all">All Courses</option>
+            <option value="ready">Ready to Start</option>
             <option value="completed">Completed</option>
             <option value="locked">Locked</option>
           </select>
 
-          {/* Category filter */}
-          {availableCategories.length > 0 && (
-            <select
-              className="toolbar-select"
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              title="Filter by category"
+          {selectedCourseCode && (
+            <button
+              type="button"
+              className={`toolbar-btn ${highlightMode === 'ancestors' ? 'toolbar-btn--active' : ''}`}
+              onClick={handleToggleHighlightAncestors}
+              title={`Highlight prerequisites needed for ${selectedCourseCode}`}
             >
-              <option value="all">All Categories</option>
-              {availableCategories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
+              <GitBranch size={12} />
+              {highlightMode === 'ancestors' ? 'Prereqs Active' : 'Show Prereqs'}
+            </button>
           )}
 
-          {/* Highlight Ancestors Button on Toolbar */}
-          <button
-            type="button"
-            id="toolbar-btn-highlight-ancestors"
-            className={`toolbar-btn ${highlightMode === 'ancestors' ? 'toolbar-btn--active' : ''}`}
-            onClick={handleToggleHighlightAncestors}
-            title={
-              selectedCourseCode
-                ? `Toggle prerequisite ancestors for ${selectedCourseCode}`
-                : 'Select a course to highlight its prerequisite ancestors'
-            }
-          >
-            <GitBranch size={12} />
-            {highlightMode === 'ancestors'
-              ? `Ancestors (${ancestorCodes.size})`
-              : 'Highlight Ancestors'}
-          </button>
-
-          {(searchQuery || statusFilter !== 'all' || categoryFilter !== 'all' || selectedCourseCode || highlightMode) && (
+          {(searchQuery || statusFilter !== 'all' || selectedCourseCode || highlightMode) && (
             <button
               type="button"
               className="toolbar-btn"
               onClick={handleResetFilters}
-              title="Reset all filters and highlights"
+              title="Reset search and filters"
+              style={{ fontSize: '0.72rem', padding: '4px 8px' }}
             >
               Reset
             </button>
           )}
         </div>
 
-        {/* Weekly Pace & View Controls */}
-        <div className="toolbar-group">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)' }}>
-            <Clock size={12} />
-            <span>Pace:</span>
-            <select
-              className="toolbar-select"
-              value={weeklyStudyHours}
-              onChange={(e) => {
-                const val = Number(e.target.value);
-                setWeeklyStudyHours(val);
-                fetchCppRoadmap(targetGoalSlug, val);
-              }}
-              title="Study hours per week"
-            >
-              <option value="10">10h / week</option>
-              <option value="15">15h / week</option>
-              <option value="20">20h / week</option>
-              <option value="25">25h / week</option>
-            </select>
-          </div>
-
+        {/* Right: DSA Interactive Tools & Zoom Controls */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {/* Feature 1: Algorithm Visualizer */}
           <button
             type="button"
-            className="toolbar-btn"
-            onClick={handleFitView}
-            title="Fit graph to canvas"
+            id="toolbar-btn-algo-inspector"
+            className="btn"
+            style={{
+              background: 'rgba(139, 124, 255, 0.18)',
+              color: '#C084FC',
+              border: '1px solid rgba(139, 124, 255, 0.4)',
+              fontSize: '0.78rem',
+              fontWeight: 600,
+              padding: '6px 12px',
+              borderRadius: 8,
+              gap: 6,
+            }}
+            onClick={() => setShowAlgoInspector(true)}
+            title="Watch how courses get unlocked step-by-step using Kahn's Algorithm"
           >
-            <Maximize2 size={12} />
-            Fit View
+            <Cpu size={14} />
+            <span>How Courses Unlock (Algorithm)</span>
           </button>
+
+          {/* Feature 2: Cognitive Capacity Planner */}
+          <button
+            type="button"
+            id="toolbar-btn-max-flow"
+            className="btn"
+            style={{
+              background: 'rgba(56, 189, 248, 0.15)',
+              color: '#38BDF8',
+              border: '1px solid rgba(56, 189, 248, 0.4)',
+              fontSize: '0.78rem',
+              fontWeight: 600,
+              padding: '6px 12px',
+              borderRadius: 8,
+              gap: 6,
+            }}
+            onClick={() => setShowCapacityPlanner(true)}
+            title="Calculate how many courses you can balance this semester without burnout"
+          >
+            <Activity size={14} />
+            <span>Study Hours Planner</span>
+          </button>
+
+          {/* Zoom Controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(0,0,0,0.25)', borderRadius: 8, padding: 2 }}>
+            <button
+              type="button"
+              className="toolbar-btn"
+              onClick={handleZoomIn}
+              title="Zoom In (+)"
+              style={{ padding: '5px 8px' }}
+            >
+              <ZoomIn size={13} />
+            </button>
+            <button
+              type="button"
+              className="toolbar-btn"
+              onClick={handleZoomOut}
+              title="Zoom Out (-)"
+              style={{ padding: '5px 8px' }}
+            >
+              <ZoomOut size={13} />
+            </button>
+            <button
+              type="button"
+              className="toolbar-btn"
+              onClick={handleFitView}
+              title="Fit map to screen"
+              style={{ padding: '5px 9px', fontSize: '0.74rem' }}
+            >
+              <Maximize2 size={12} />
+              Fit View
+            </button>
+          </div>
 
           <button
             type="button"
             className={`toolbar-btn ${showLegend ? 'toolbar-btn--active' : ''}`}
             onClick={() => setShowLegend((prev) => !prev)}
-            title="Toggle graph legend"
+            title="Toggle legend"
+            style={{ padding: '5px 8px' }}
           >
-            <HelpCircle size={12} />
-            Legend
+            <HelpCircle size={13} />
           </button>
         </div>
       </div>
@@ -828,7 +938,7 @@ export default function RoadmapView({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '8px 16px',
+            padding: '7px 16px',
             background: 'rgba(245, 166, 35, 0.12)',
             borderBottom: '1px solid rgba(245, 166, 35, 0.3)',
             color: '#F5A623',
@@ -849,106 +959,6 @@ export default function RoadmapView({
             <X size={12} />
           </button>
         </div>
-      )}
-
-      {highlightMode === 'ancestors' && selectedCourseCode && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '8px 16px',
-            background: 'rgba(56, 189, 248, 0.12)',
-            borderBottom: '1px solid rgba(56, 189, 248, 0.3)',
-            color: '#38BDF8',
-            fontSize: '0.76rem',
-            fontWeight: 500,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <GitBranch size={14} />
-            <span>
-              Showing <strong>{ancestorCodes.size}</strong> prerequisite ancestor{ancestorCodes.size === 1 ? '' : 's'} for <strong>{selectedCourseCode}</strong> (connected arrows highlighted in cyan).
-            </span>
-          </div>
-          <button
-            type="button"
-            className="btn btn-ghost"
-            style={{ padding: '3px 10px', fontSize: '0.72rem', color: '#38BDF8', border: '1px solid rgba(56, 189, 248, 0.35)', borderRadius: 6 }}
-            onClick={() => setHighlightMode(null)}
-          >
-            Clear Highlights
-          </button>
-        </div>
-      )}
-
-      {/* ── Metrics Strip: Total Workload vs Critical Path ── */}
-      {cppResult?.studyTimeEstimates && !error && (
-        <div className="graph-metrics-strip">
-          <div className="metrics-items-group">
-            {/* Total Workload */}
-            <div className="metric-pill" title="Total study hours across all courses in this roadmap">
-              <Layers size={13} color="var(--accent-2)" />
-              <span>
-                Total Workload:{' '}
-                <strong className="metric-value-strong">
-                  {cppResult.studyTimeEstimates.totalStudyHours}h
-                </strong>
-                <span className="metric-helper-tip">
-                  ({cppResult.studyTimeEstimates.serialEstimatedWeeks} wks serial)
-                </span>
-              </span>
-            </div>
-
-            {/* Critical Path Duration */}
-            <div
-              className="metric-pill"
-              title="Minimum calendar time required along the longest prerequisite dependency chain when independent courses can be studied in parallel"
-            >
-              <Clock size={13} color="#F5A623" />
-              <span>
-                Critical-Path Duration:{' '}
-                <strong className="metric-value-accent">
-                  {cppResult.studyTimeEstimates.criticalPathHours}h
-                </strong>
-                <span className="metric-helper-tip">
-                  ({cppResult.studyTimeEstimates.parallelEstimatedWeeks} wks parallel)
-                </span>
-              </span>
-            </div>
-          </div>
-
-          {/* Bottleneck Path */}
-          {cppResult.criticalPathCodes?.length > 0 && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                fontSize: '0.72rem',
-                color: '#F5A623',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                maxWidth: '100%',
-              }}
-              title="The sequence of dependent courses that dictates the minimum completion duration"
-            >
-              <Sparkles size={12} />
-              <span>
-                <strong>Bottleneck Path:</strong> {cppResult.criticalPathCodes.join(' → ')}
-              </span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Recommended Next Courses Tray ─────────────────── */}
-      {!loading && !error && cppResult?.recommendedNextCourses && (
-        <RecommendedCoursesTray
-          recommendedCourses={cppResult.recommendedNextCourses}
-          onSelectCourse={handleSelectCourseByCode}
-        />
       )}
 
       {/* ── Loading State ─────────────────────────────────── */}
@@ -1029,7 +1039,18 @@ export default function RoadmapView({
       {!loading && !error && (
         <div
           ref={reactFlowWrapper}
-          style={{ width: '100%', height: 640, minHeight: 560, position: 'relative', overflow: 'hidden' }}
+          style={{
+            width: '100%',
+            height: 'calc(100vh - 260px)',
+            minHeight: 560,
+            position: 'relative',
+            overflow: 'hidden',
+            background: 'var(--roadmap-canvas-bg)',
+            border: '1px solid var(--border)',
+            borderTop: 'none',
+            borderBottomLeftRadius: 10,
+            borderBottomRightRadius: 10,
+          }}
         >
           <ReactFlow
             nodes={nodes}
@@ -1045,21 +1066,24 @@ export default function RoadmapView({
             }}
             onInit={setReactFlowInstance}
             fitView
-            fitViewOptions={{ padding: 0.18 }}
+            fitViewOptions={{ padding: 0.2, minZoom: 0.3, maxZoom: 1.5 }}
             proOptions={{ hideAttribution: true }}
             nodesDraggable={true}
             nodesConnectable={false}
             elementsSelectable={true}
-            minZoom={0.2}
-            maxZoom={2.2}
-            colorMode="dark"
+            minZoom={0.3}
+            maxZoom={1.5}
+            zoomOnScroll={true}
+            zoomOnPinch={true}
+            panOnScroll={false}
+            colorMode={typeof document !== 'undefined' && document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'}
           >
-            <Background color="rgba(255, 255, 255, 0.04)" gap={24} size={1} />
+            <Background color="var(--roadmap-grid-dot, rgba(255, 255, 255, 0.04))" gap={24} size={1} />
             <Controls
-              showInteractive={false}
+              showInteractive={true}
               style={{
-                background: '#141C30',
-                border: '1px solid rgba(255,255,255,0.08)',
+                background: 'var(--roadmap-controls-bg, #141C30)',
+                border: '1px solid var(--border, rgba(255,255,255,0.08))',
                 borderRadius: 8,
               }}
             />
@@ -1072,11 +1096,11 @@ export default function RoadmapView({
                 return '#374151';
               }}
               style={{
-                background: '#0E1425',
-                border: '1px solid rgba(255,255,255,0.08)',
+                background: 'var(--roadmap-minimap-bg, #0E1425)',
+                border: '1px solid var(--border, rgba(255,255,255,0.08))',
                 borderRadius: 8,
               }}
-              maskColor="rgba(11, 16, 32, 0.8)"
+              maskColor="var(--roadmap-mask, rgba(11, 16, 32, 0.8))"
             />
           </ReactFlow>
 
@@ -1141,8 +1165,92 @@ export default function RoadmapView({
               </div>
             </div>
           )}
+
         </div>
       )}
+
+      {/* ── Student Friendly Bottom Helper Strip ── */}
+      {!loading && !error && cppResult && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 12,
+            padding: '9px 16px',
+            background: 'rgba(15, 23, 42, 0.95)',
+            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+            fontSize: '0.8rem',
+            color: '#CBD5E1',
+          }}
+        >
+          {cppResult.recommendedNextCourses?.[0] ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span
+                style={{
+                  background: 'rgba(82, 217, 164, 0.15)',
+                  color: '#52D9A4',
+                  fontWeight: 600,
+                  fontSize: '0.72rem',
+                  padding: '2px 8px',
+                  borderRadius: 6,
+                }}
+              >
+                💡 Ready to Start Now
+              </span>
+              <span>
+                <strong>{cppResult.recommendedNextCourses[0].title}</strong> ({cppResult.recommendedNextCourses[0].estimatedHours}h)
+              </span>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                style={{ fontSize: '0.72rem', padding: '2px 8px', color: '#8B7CFF' }}
+                onClick={() => handleSelectCourseByCode(cppResult.recommendedNextCourses[0].code)}
+              >
+                View Syllabus &rarr;
+              </button>
+            </div>
+          ) : (
+            <span style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.6)' }}>
+              💡 Click any course card to inspect its syllabus, duration, and prerequisites.
+            </span>
+          )}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '0.74rem', color: 'rgba(255, 255, 255, 0.5)' }}>
+            <span>Total: <strong style={{ color: '#E2E8F0' }}>{cppResult.studyTimeEstimates?.totalStudyHours || 0}h</strong></span>
+            <span>&bull;</span>
+            <span>{cppResult.learningOrder?.length || 0} courses</span>
+            <span>&bull;</span>
+            <span style={{ color: '#52D9A4' }}>⚡ C++ Engine: {cppResult.diagnostics?.executionTimeMs?.toFixed(2) || '0.00'}ms</span>
+          </div>
+        </div>
+      )}
+
+      {/* ── Feature 1: Algorithm Inspector Modal (Always Mounted) ──────── */}
+      <AlgorithmVisualizerModal
+        isOpen={showAlgoInspector}
+        onClose={() => {
+          setShowAlgoInspector(false);
+          setActiveStep(null);
+        }}
+        steps={cppResult?.steps || []}
+        goalTitle={targetGoalSlug ? (GOAL_SLUG_MAP[goalId] || targetGoalSlug) : 'Curriculum Track'}
+        onStepChange={(step) => setActiveStep(step)}
+      />
+
+      {/* ── Feature 2: Student Study Hours & Burnout Planner (Always Mounted) ── */}
+      <CognitiveFlowModal
+        isOpen={showCapacityPlanner}
+        onClose={() => setShowCapacityPlanner(false)}
+        maxFlowData={cppResult?.maxFlow}
+        currentWeeklyHours={weeklyStudyHours}
+        onPaceChange={(newHours) => {
+          setWeeklyStudyHours(newHours);
+          fetchCppRoadmap(targetGoalSlug, newHours, true); // silent = true so window never minimizes!
+        }}
+        goalTitle={targetGoalSlug ? (GOAL_SLUG_MAP[goalId] || targetGoalSlug) : 'Curriculum Track'}
+      />
     </div>
   );
 }
