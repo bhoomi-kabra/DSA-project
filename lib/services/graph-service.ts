@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { runCppGraphEngine, CppGraphInput } from "./cpp-graph-runner";
+import { runCppGraphEngine, CppGraphInput, CppAnalysisResult } from "./cpp-graph-runner";
 
 export interface GraphNode {
   id: string;
@@ -357,12 +357,12 @@ export class GraphService {
     };
 
     // Execute C++ algorithm engine with automated TypeScript fallback for Vercel/cloud deployment
-    let cppResult: any;
+    let cppResult: CppAnalysisResult;
     try {
       cppResult = await runCppGraphEngine(cppInput);
     } catch (err: any) {
       console.warn("Native C++ binary invocation failed, running pure TypeScript graph algorithm fallback:", err.message);
-      cppResult = this.executeFallbackGraphAlgorithms(cppInput);
+      cppResult = this.executeFallbackGraphAlgorithms(cppInput) as unknown as CppAnalysisResult;
     }
 
     if (cppResult.hasCycle) {
@@ -406,8 +406,8 @@ export class GraphService {
     const subgraphFwdAdj = new Map<string, string[]>(); // courseId -> array of unlocked courseIds
 
     for (const e of cppResult.edges) {
-      const fromNode = cppResult.learningOrder.find((n) => n.code === e.fromCode);
-      const toNode = cppResult.learningOrder.find((n) => n.code === e.toCode);
+      const fromNode = cppResult.learningOrder.find((n: any) => n.code === e.fromCode);
+      const toNode = cppResult.learningOrder.find((n: any) => n.code === e.toCode);
       if (fromNode && toNode) {
         if (!subgraphRevAdj.has(toNode.id)) subgraphRevAdj.set(toNode.id, []);
         subgraphRevAdj.get(toNode.id)!.push(fromNode.id);
@@ -418,10 +418,10 @@ export class GraphService {
     }
 
     const nodeById = new Map<string, any>();
-    cppResult.learningOrder.forEach((n) => nodeById.set(n.id, n));
+    cppResult.learningOrder.forEach((n: any) => nodeById.set(n.id, n));
 
     // Enrich courses with status, prerequisites, dependents, and recommendations
-    const enrichedOrder = cppResult.learningOrder.map((course) => {
+    const enrichedOrder = cppResult.learningOrder.map((course: any) => {
       const isCompleted = completedCourseIds.has(course.id);
       const prereqIds = subgraphRevAdj.get(course.id) || [];
       const dependentIds = subgraphFwdAdj.get(course.id) || [];
@@ -483,15 +483,15 @@ export class GraphService {
 
     // Compute remaining workload
     let remainingStudyHours = 0;
-    enrichedOrder.forEach((c) => {
+    enrichedOrder.forEach((c: any) => {
       if (c.status !== "completed") {
         remainingStudyHours += c.estimatedHours;
       }
     });
 
     const recommendedNextCourses = enrichedOrder
-      .filter((c) => c.status === "in-progress")
-      .sort((a, b) => {
+      .filter((c: any) => c.status === "in-progress")
+      .sort((a: any, b: any) => {
         if (a.isCritical && !b.isCritical) return -1;
         if (!a.isCritical && b.isCritical) return 1;
         return (b.dependents?.length || 0) - (a.dependents?.length || 0);
@@ -499,7 +499,7 @@ export class GraphService {
 
     // Build React Flow nodes and edges layout with computed levels
     const levelCounts: Record<number, number> = {};
-    enrichedOrder.forEach((n) => {
+    enrichedOrder.forEach((n: any) => {
       levelCounts[n.level] = (levelCounts[n.level] || 0) + 1;
     });
 
@@ -507,7 +507,7 @@ export class GraphService {
     const HGAP = 240;
     const VGAP = 120;
 
-    const flowNodes = enrichedOrder.map((n) => {
+    const flowNodes = enrichedOrder.map((n: any) => {
       levelOffset[n.level] = levelOffset[n.level] || 0;
       const count = levelCounts[n.level];
       const idx = levelOffset[n.level]++;
@@ -532,9 +532,9 @@ export class GraphService {
       };
     });
 
-    const flowEdges = cppResult.edges.map((e, idx) => {
-      const fromNode = enrichedOrder.find((n) => n.code === e.fromCode);
-      const toNode = enrichedOrder.find((n) => n.code === e.toCode);
+    const flowEdges = cppResult.edges.map((e: any, idx: number) => {
+      const fromNode = enrichedOrder.find((n: any) => n.code === e.fromCode);
+      const toNode = enrichedOrder.find((n: any) => n.code === e.toCode);
       return {
         id: `e-${idx}`,
         source: fromNode ? fromNode.id : `code-${e.fromCode}`,
@@ -619,14 +619,15 @@ export class GraphService {
     }
 
     // 3. Induced subgraph vertices and edges
-    const activeVertices = Array.from(activeVertexIndices).map((idx) => vertices[idx]);
+    const activeIndicesList = Array.from(activeVertexIndices);
+    const activeVertices = activeIndicesList.map((idx) => vertices[idx]);
     const activeEdges = edges.filter(
       (e: any) => activeVertexIndices.has(e.u) && activeVertexIndices.has(e.v)
     );
 
     // 4. In-Degree Calculation & Kahn's Topological Sort
     const inDegree = new Map<number, number>();
-    for (const idx of activeVertexIndices) {
+    for (const idx of activeIndicesList) {
       inDegree.set(idx, 0);
     }
     for (const e of activeEdges) {
@@ -635,7 +636,7 @@ export class GraphService {
 
     const queue: number[] = [];
     const levels = new Map<number, number>();
-    for (const idx of activeVertexIndices) {
+    for (const idx of activeIndicesList) {
       if ((inDegree.get(idx) || 0) === 0) {
         queue.push(idx);
         levels.set(idx, 0);
@@ -660,10 +661,10 @@ export class GraphService {
       }
     }
 
-    const hasCycle = topoOrderIndices.length < activeVertexIndices.size;
+    const hasCycle = topoOrderIndices.length < activeIndicesList.length;
     const cycleNodes: string[] = [];
     if (hasCycle) {
-      for (const idx of activeVertexIndices) {
+      for (const idx of activeIndicesList) {
         if ((inDegree.get(idx) || 0) > 0) {
           cycleNodes.push(vertices[idx].code);
         }
@@ -688,7 +689,7 @@ export class GraphService {
 
     const distTo = new Map<number, number>();
     const parent = new Map<number, number>();
-    for (const idx of activeVertexIndices) {
+    for (const idx of activeIndicesList) {
       distTo.set(idx, vertices[idx].estimatedHours || 0);
       parent.set(idx, -1);
     }
@@ -709,7 +710,7 @@ export class GraphService {
 
     let maxDist = 0;
     let endNode = -1;
-    for (const idx of activeVertexIndices) {
+    for (const idx of activeIndicesList) {
       const dist = distTo.get(idx) || 0;
       if (dist > maxDist) {
         maxDist = dist;
@@ -767,7 +768,7 @@ export class GraphService {
         toCode: e.toCode,
       })),
       steps: [],
-      maxFlow: null,
+      maxFlow: undefined,
       diagnostics: {
         executionTimeMs,
         nodesAnalyzed: activeVertices.length,

@@ -85,8 +85,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       ...roadmap,
       stats: {
-        coursesCompleted: roadmap.completedCount,
-        coursesRemaining: Math.max(0, roadmap.totalCourses - roadmap.completedCount),
+        coursesCompleted: roadmap.summary.completedCount,
+        coursesRemaining: Math.max(0, roadmap.summary.totalCourses - roadmap.summary.completedCount),
         hoursLogged: Math.round(totalHoursLogged),
         currentStreak,
       },
