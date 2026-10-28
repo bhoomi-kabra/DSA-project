@@ -308,6 +308,43 @@ void test10_StudyTimeEstimation() {
     assert(res.studyTimeEstimates.parallelEstimatedWeeks == 7);
 }
 
+// Test 11: Algorithm Inspector Micro-Step Tracing
+void test11_StepByStepTrace() {
+    DirectedGraph g;
+    g.addVertex({0, "id-a", "A", "Course A", 10, "General", 0});
+    g.addVertex({1, "id-b", "B", "Course B", 20, "General", 0});
+    g.addVertex({2, "id-c", "C", "Course C", 30, "General", 0});
+    g.addEdge(0, 1); // A -> B
+    g.addEdge(1, 2); // B -> C
+
+    std::vector<std::string> cycleNodes, blockedNodes;
+    std::vector<AlgorithmStep> steps;
+    auto topoRes = g.computeTopologicalSortWithSteps(cycleNodes, blockedNodes, steps);
+
+    assert(!topoRes.second); // No cycle
+    assert(topoRes.first.size() == 3);
+    assert(!steps.empty());
+    assert(steps[0].type == "INITIALIZE");
+    assert(steps.back().type == "FINISHED");
+    assert(steps[0].queueState.size() == 1 && steps[0].queueState[0] == "A");
+}
+
+// Test 12: Edmonds-Karp Student Cognitive Capacity Max Flow & Min-Cut
+void test12_EdmondsKarpMaxFlowMinCut() {
+    DirectedGraph g;
+    g.addVertex({0, "id-a", "CS101", "Intro CS", 30, "Core", 0});
+    g.addVertex({1, "id-b", "CS102", "Data Structures", 40, "Core", 0});
+    g.addVertex({2, "id-c", "AI101", "Intro AI", 50, "AI", 0});
+
+    MaxFlowResult flowRes = g.computeStudentCognitiveCapacity(10, 12); // 120h total capacity
+    assert(flowRes.success);
+    assert(flowRes.sourceCapacity == 120);
+    assert(flowRes.maxFlow > 0);
+    assert(flowRes.maxFlow <= 120);
+    assert(!flowRes.recommendedCourses.empty());
+    assert(!flowRes.flowNetwork.empty());
+}
+
 int main() {
     std::cout << "========================================\n";
     std::cout << "PathPilot C++ Graph Algorithm Engine Tests\n";
@@ -323,6 +360,8 @@ int main() {
     RUN_TEST(test8_EmptyGraph);
     RUN_TEST(test9_InvalidInput);
     RUN_TEST(test10_StudyTimeEstimation);
+    RUN_TEST(test11_StepByStepTrace);
+    RUN_TEST(test12_EdmondsKarpMaxFlowMinCut);
 
     std::cout << "========================================\n";
     std::cout << "Results: " << passedTests << " / " << totalTests << " passed.\n";

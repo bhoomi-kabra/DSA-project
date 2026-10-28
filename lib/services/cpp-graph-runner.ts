@@ -25,8 +25,9 @@ export interface CppInputEdge {
 }
 
 export interface CppGraphInput {
-  operation?: "goal-roadmap" | "topological-sort" | "analyze";
+  operation?: "goal-roadmap" | "topological-sort" | "analyze" | "trace" | "max-flow";
   weeklyStudyHours?: number;
+  recordSteps?: boolean;
   targetIndices?: number[];
   targetCodes?: string[];
   targetIds?: string[];
@@ -53,6 +54,39 @@ export interface CppStudyTimeEstimates {
   explanation: string;
 }
 
+export interface CppAlgorithmStep {
+  stepNumber: number;
+  type: string;
+  description: string;
+  activeNodeCode?: string;
+  targetNodeCode?: string;
+  queueState: string[];
+  inDegrees: Record<string, number>;
+  currentOrder: string[];
+}
+
+export interface CppMaxFlowEdge {
+  from: number;
+  to: number;
+  capacity: number;
+  flow: number;
+  fromLabel: string;
+  toLabel: string;
+  isBottleneck: boolean;
+}
+
+export interface CppMaxFlowResult {
+  success: boolean;
+  sourceCapacity: number;
+  maxFlow: number;
+  utilizationPercent: number;
+  minCutBottlenecks: string[];
+  recommendedCourses: string[];
+  overloadedCourses: string[];
+  flowNetwork: CppMaxFlowEdge[];
+  diagnosis: string;
+}
+
 export interface CppAnalysisResult {
   success: boolean;
   operation: string;
@@ -70,6 +104,8 @@ export interface CppAnalysisResult {
   criticalPathHours: number;
   studyTimeEstimates: CppStudyTimeEstimates;
   edges: Array<{ u: number; v: number; fromCode: string; toCode: string }>;
+  steps?: CppAlgorithmStep[];
+  maxFlow?: CppMaxFlowResult;
   diagnostics?: {
     executionTimeMs: number;
     nodesAnalyzed: number;

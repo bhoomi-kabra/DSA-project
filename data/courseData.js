@@ -613,3 +613,12 @@ export const SAMPLE_GRAPHS = {
     ],
   },
 };
+
+// ── Human-Readable Course Lookups ───────────────────────────────────────────
+export const COURSE_MAP = Object.fromEntries(COURSES.map((c) => [c.code, c]));
+export const getCourseTitle = (code) => COURSE_MAP[code]?.title || code;
+export const getCourseShortTitle = (code) => {
+  const c = COURSE_MAP[code];
+  if (!c) return code;
+  return c.title.length > 26 ? c.title.slice(0, 24) + '...' : c.title;
+};

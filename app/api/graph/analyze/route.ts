@@ -16,13 +16,14 @@ export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
-    const { goal, userId, operation, weeklyStudyHours } = body;
+    const { goal, userId, operation, weeklyStudyHours, recordSteps } = body;
 
     const result = await GraphService.executeCppRoadmap({
       goalSlug: goal,
       userId,
       operation,
       weeklyStudyHours,
+      recordSteps,
     });
 
     return NextResponse.json(result);

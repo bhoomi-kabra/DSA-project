@@ -751,3 +751,253 @@
     gap: 18px;
   }
 }
+
+.auth-main-panel {
+  position: relative;
+}
+
+.auth-theme-control {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  z-index: 5;
+}
+
+@media (max-width: 850px) {
+  .auth-theme-control {
+    top: 18px;
+    right: 20px;
+  }
+}
+
+/* =========================================
+   PathPilot Authentication — Light Theme
+   ========================================= */
+
+:root[data-theme="light"] .auth-page {
+  --auth-bg: #F7F6F0;
+  --auth-panel: #EFEDE5;
+  --auth-card: #FFFFFF;
+  --auth-border: rgba(41, 43, 37, 0.12);
+
+  --auth-text: #292B25;
+  --auth-muted: #565B52;
+
+  --auth-purple: #926B0B;
+  --auth-purple-light: #A57A0E;
+  --auth-blue: #647D8A;
+  --auth-green: #64805A;
+
+  background: var(--auth-bg);
+  color: var(--auth-text);
+}
+
+/* Branding panel */
+:root[data-theme="light"] .auth-brand-panel {
+  background:
+    radial-gradient(
+      ellipse at 12% 18%,
+      rgba(201, 155, 34, 0.10),
+      transparent 43%
+    ),
+    #EFEDE5;
+  border-right-color: rgba(41, 43, 37, 0.10);
+}
+
+:root[data-theme="light"] .auth-brand-panel::before {
+  opacity: 0.06;
+  background-image: radial-gradient(
+    rgba(41, 43, 37, 0.30) 0.7px,
+    transparent 0.7px
+  );
+}
+
+:root[data-theme="light"] .auth-brand-name > span,
+:root[data-theme="light"] .auth-brand-main h1,
+:root[data-theme="light"] .auth-roadmap-header h3,
+:root[data-theme="light"] .auth-step-content strong,
+:root[data-theme="light"] .auth-form-heading h2 {
+  color: #292B25;
+}
+
+:root[data-theme="light"] .auth-brand-name small,
+:root[data-theme="light"] .auth-card-overline,
+:root[data-theme="light"] .auth-step-content span,
+:root[data-theme="light"] .auth-brand-footer,
+:root[data-theme="light"] .auth-main-footer {
+  color: #73776F;
+}
+
+:root[data-theme="light"] .auth-brand-main h1 span,
+:root[data-theme="light"] .auth-eyebrow,
+:root[data-theme="light"] .auth-form-kicker {
+  color: #926B0B;
+}
+
+:root[data-theme="light"] .auth-brand-description,
+:root[data-theme="light"] .auth-form-heading p,
+:root[data-theme="light"] .auth-benefits > div {
+  color: #59635B;
+}
+
+/* Roadmap illustration */
+:root[data-theme="light"] .auth-roadmap-card {
+  border-color: rgba(41, 43, 37, 0.12);
+  background: #FFFFFF;
+  box-shadow: 0 3px 12px rgba(41, 43, 37, 0.04);
+}
+
+:root[data-theme="light"] .auth-roadmap-step.completed {
+  background: rgba(100, 128, 90, 0.08);
+}
+
+:root[data-theme="light"] .auth-roadmap-step.active {
+  border-color: rgba(146, 107, 11, 0.25);
+  background: rgba(201, 155, 34, 0.09);
+}
+
+:root[data-theme="light"] .auth-step-icon {
+  color: #68746A;
+  background: #F2F0E8;
+}
+
+:root[data-theme="light"] .auth-roadmap-step.completed .auth-step-icon {
+  color: #64805A;
+  background: rgba(100, 128, 90, 0.12);
+}
+
+:root[data-theme="light"] .auth-roadmap-step.active .auth-step-icon {
+  color: #926B0B;
+  background: rgba(201, 155, 34, 0.14);
+}
+
+:root[data-theme="light"] .auth-roadmap-step.completed .auth-step-status {
+  color: #557B50;
+}
+
+:root[data-theme="light"] .auth-roadmap-step.active .auth-step-status,
+:root[data-theme="light"] .auth-benefits svg {
+  color: #926B0B;
+}
+
+:root[data-theme="light"] .auth-roadmap-connector {
+  background: linear-gradient(
+    to bottom,
+    rgba(146, 107, 11, 0.45),
+    rgba(41, 43, 37, 0.12)
+  );
+}
+
+:root[data-theme="light"] .auth-card-decoration span {
+  background: #D8D9D0;
+}
+
+:root[data-theme="light"] .auth-card-decoration span:first-child {
+  background: #C89B22;
+}
+
+/* Login form panel */
+:root[data-theme="light"] .auth-main-panel {
+  background: #F7F6F0;
+}
+
+:root[data-theme="light"] .auth-field label {
+  color: #34382F;
+}
+
+:root[data-theme="light"] .auth-input-wrap {
+  color: #68746A;
+  background: #FFFFFF;
+  border-color: rgba(41, 43, 37, 0.16);
+}
+
+:root[data-theme="light"] .auth-input-wrap:focus-within {
+  background: #FFFFFF;
+  border-color: #B18A19;
+  box-shadow: 0 0 0 3px rgba(201, 155, 34, 0.12);
+}
+
+:root[data-theme="light"] .auth-input-wrap input {
+  color: #292B25;
+}
+
+:root[data-theme="light"] .auth-input-wrap input::placeholder {
+  color: #777F76;
+}
+
+:root[data-theme="light"] .auth-input-wrap input:-webkit-autofill,
+:root[data-theme="light"] .auth-input-wrap input:-webkit-autofill:hover,
+:root[data-theme="light"] .auth-input-wrap input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #292B25;
+}
+
+:root[data-theme="light"] .auth-password-toggle {
+  color: #68746A;
+}
+
+:root[data-theme="light"] .auth-text-button {
+  color: #87660D;
+}
+
+:root[data-theme="light"] .auth-text-button:hover {
+  color: #654A08;
+}
+
+/* Main button */
+:root[data-theme="light"] .auth-submit-btn {
+  color: #292B25;
+  background: #D1A02C;
+  border-color: rgba(146, 107, 11, 0.22);
+  box-shadow: 0 2px 5px rgba(41, 43, 37, 0.08);
+}
+
+:root[data-theme="light"] .auth-submit-btn:hover {
+  background: #DDB149;
+  box-shadow: 0 3px 8px rgba(41, 43, 37, 0.10);
+  filter: none;
+}
+
+:root[data-theme="light"] .auth-mode-switch {
+  color: #59635B;
+}
+
+:root[data-theme="light"] .auth-demo-note {
+  color: #59635B;
+  background: #F0EEE5;
+  border-color: rgba(41, 43, 37, 0.10);
+}
+
+:root[data-theme="light"] .auth-demo-note svg {
+  color: #87660D;
+}
+
+:root[data-theme="light"] .auth-error {
+  color: #963B35;
+  background: #FFF0ED;
+  border-color: rgba(182, 72, 64, 0.24);
+}
+
+:root[data-theme="light"] .auth-submit-btn:focus-visible,
+:root[data-theme="light"] .auth-text-button:focus-visible,
+:root[data-theme="light"] .auth-password-toggle:focus-visible {
+  outline-color: #926B0B;
+}
+
+/* PathPilot logo in authentication screens */
+.auth-logo-mark {
+  background: #292B25;
+  box-shadow: none;
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-logo-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+

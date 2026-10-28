@@ -25,12 +25,13 @@ const STATUS_LABEL = {
   locked:      'Locked',
 };
 
-export default function ProgressView({ courses = COURSES }) {
-  const completedCount = courses.filter(
+export default function ProgressView({ courses = COURSES, stats = null }) {
+  const completedCount = stats?.coursesCompleted ?? courses.filter(
     course => course.status === 'completed'
   ).length;
 
-  const remainingCount = courses.length - completedCount;
+  const remainingCount = stats?.coursesRemaining ?? Math.max(0, courses.length - completedCount);
+  const streak = stats?.currentStreak ?? 0;
 
   const overall = courses.length
     ? Math.round((completedCount / courses.length) * 100)
@@ -40,18 +41,17 @@ export default function ProgressView({ courses = COURSES }) {
     <div className="view-wrap">
       <h1 className="view-heading">My Progress</h1>
       <p className="view-sub">
-        Track your completion across all learning paths.{' '}
-        <span className="sample-notice"><Info size={11} /> Sample data</span>
+        Real-time knowledge state across all modules computed from your learning activity.
       </p>
 
       {/* Summary tiles */}
       <div className="stats-row stagger" style={{ marginBottom: 32 }}>
         {[
-  { icon: Award, color: 'var(--success)', val: completedCount, lbl: 'Completed' },
-  { icon: TrendingUp, color: 'var(--accent)', val: remainingCount, lbl: 'Remaining' },
-  { icon: Flame, color: 'var(--warn)', val: `${PROGRESS.currentStreak}d`, lbl: 'Streak' },
-  { icon: Award, color: 'var(--accent-2)', val: `${overall}%`, lbl: 'Overall' },
-].map(({ icon: Icon, color, val, lbl }) => (
+          { icon: Award, color: 'var(--success)', val: completedCount, lbl: 'Completed' },
+          { icon: TrendingUp, color: 'var(--accent)', val: remainingCount, lbl: 'Remaining' },
+          { icon: Flame, color: 'var(--warn)', val: `${streak}d`, lbl: 'Streak' },
+          { icon: Award, color: 'var(--accent-2)', val: `${overall}%`, lbl: 'Overall' },
+        ].map(({ icon: Icon, color, val, lbl }) => (
           <div key={lbl} className="stat-tile anim-fade-up">
             <div className="stat-icon-wrap" style={{ background: `${color}1a` }}>
               <Icon size={16} color={color} strokeWidth={2} />

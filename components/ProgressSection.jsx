@@ -18,16 +18,20 @@ const STATUS_CONFIG = {
 // Show the first 5 courses as recent activity
 const RECENT = COURSES.slice(0, 5);
 
-export default function ProgressSection() {
-  const pct = Math.round((PROGRESS.coursesCompleted / PROGRESS.totalCourses) * 100);
+export default function ProgressSection({ stats = null }) {
+  const completed = stats?.coursesCompleted ?? 0;
+  const remaining = stats?.coursesRemaining ?? 44;
+  const hours = stats?.hoursLogged ?? 0;
+  const streak = stats?.currentStreak ?? 0;
+  const total = completed + remaining || 44;
+  const pct = Math.round((completed / total) * 100);
 
   return (
     <div className="progress-section">
       <div className="progress-header">
         <h2>Learning Overview</h2>
-        <span className="sample-notice">
-          <Info size={11} />
-          Sample data
+        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+          Live Database Sync
         </span>
       </div>
 
@@ -36,26 +40,26 @@ export default function ProgressSection() {
         <div className="prog-item">
           <span className="prog-label">Completed</span>
           <span className="prog-val" style={{ color: 'var(--success)' }}>
-            {PROGRESS.coursesCompleted}
+            {completed}
           </span>
           <span className="prog-sub">courses done</span>
         </div>
         <div className="prog-item">
           <span className="prog-label">Remaining</span>
-          <span className="prog-val">{PROGRESS.coursesRemaining}</span>
+          <span className="prog-val">{remaining}</span>
           <span className="prog-sub">courses left</span>
         </div>
         <div className="prog-item">
           <span className="prog-label">Hours Logged</span>
           <span className="prog-val" style={{ color: 'var(--accent-2)' }}>
-            {PROGRESS.hoursLogged}h
+            {hours}h
           </span>
           <span className="prog-sub">total study time</span>
         </div>
         <div className="prog-item">
           <span className="prog-label">Streak</span>
           <span className="prog-val" style={{ color: 'var(--warn)' }}>
-            {PROGRESS.currentStreak}
+            {streak}
           </span>
           <span className="prog-sub">days in a row</span>
         </div>

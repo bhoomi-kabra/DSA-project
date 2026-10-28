@@ -82,6 +82,82 @@ struct StudyTimeEstimates {
     }
 };
 
+struct AlgorithmStep {
+    int stepNumber = 0;
+    std::string type; // "INITIALIZE", "POP_QUEUE", "VISIT_EDGE", "DECREMENT_INDEGREE", "PUSH_QUEUE", "NODE_COMPLETED", "CYCLE_DETECTED", "FINISHED"
+    std::string description;
+    std::string activeNodeCode;
+    std::string targetNodeCode;
+    std::vector<std::string> queueState;
+    std::unordered_map<std::string, int> inDegrees;
+    std::vector<std::string> currentOrder;
+
+    json toJson() const {
+        return json{
+            {"stepNumber", stepNumber},
+            {"type", type},
+            {"description", description},
+            {"activeNodeCode", activeNodeCode},
+            {"targetNodeCode", targetNodeCode},
+            {"queueState", queueState},
+            {"inDegrees", inDegrees},
+            {"currentOrder", currentOrder}
+        };
+    }
+};
+
+struct MaxFlowEdge {
+    int from = -1;
+    int to = -1;
+    int capacity = 0;
+    int flow = 0;
+    std::string fromLabel;
+    std::string toLabel;
+    bool isBottleneck = false;
+
+    json toJson() const {
+        return json{
+            {"from", from},
+            {"to", to},
+            {"capacity", capacity},
+            {"flow", flow},
+            {"fromLabel", fromLabel},
+            {"toLabel", toLabel},
+            {"isBottleneck", isBottleneck}
+        };
+    }
+};
+
+struct MaxFlowResult {
+    bool success = true;
+    int sourceCapacity = 0;
+    int maxFlow = 0;
+    int utilizationPercent = 0;
+    std::vector<std::string> minCutBottlenecks;
+    std::vector<std::string> recommendedCourses;
+    std::vector<std::string> overloadedCourses;
+    std::vector<MaxFlowEdge> flowNetwork;
+    std::string diagnosis;
+
+    json toJson() const {
+        json net = json::array();
+        for (const auto& edge : flowNetwork) {
+            net.push_back(edge.toJson());
+        }
+        return json{
+            {"success", success},
+            {"sourceCapacity", sourceCapacity},
+            {"maxFlow", maxFlow},
+            {"utilizationPercent", utilizationPercent},
+            {"minCutBottlenecks", minCutBottlenecks},
+            {"recommendedCourses", recommendedCourses},
+            {"overloadedCourses", overloadedCourses},
+            {"flowNetwork", net},
+            {"diagnosis", diagnosis}
+        };
+    }
+};
+
 struct AnalysisResult {
     bool success = true;
     std::string operation = "analyze";
@@ -98,6 +174,8 @@ struct AnalysisResult {
     std::vector<std::string> blockedNodes;
     StudyTimeEstimates studyTimeEstimates;
     std::vector<PrereqEdge> edges;
+    std::vector<AlgorithmStep> steps;
+    MaxFlowResult maxFlowResult;
 
     json toJson() const;
 };
@@ -141,6 +219,13 @@ public:
         std::vector<std::string>& outBlockedNodes
     ) const;
 
+    // Algorithm C with Micro-Step Recording for Live Algorithm Inspector
+    std::pair<std::vector<CourseVertex>, bool> computeTopologicalSortWithSteps(
+        std::vector<std::string>& outCycleNodes,
+        std::vector<std::string>& outBlockedNodes,
+        std::vector<AlgorithmStep>& outSteps
+    ) const;
+
     // Algorithm E: Critical Path and Study Time Analysis
     StudyTimeEstimates computeCriticalPath(
         const std::vector<CourseVertex>& topoOrder,
@@ -149,11 +234,18 @@ public:
         int weeklyStudyHours = 10
     ) const;
 
+    // Algorithm F: Maximum Flow & Min-Cut Student Cognitive Capacity Planner (Edmonds-Karp)
+    MaxFlowResult computeStudentCognitiveCapacity(
+        int weeklyStudyHours = 15,
+        int semesterWeeks = 12
+    ) const;
+
     // High-level analysis pipeline
     AnalysisResult analyze(
         const std::string& operation = "analyze",
         const std::vector<int>& targetIndices = {},
-        int weeklyStudyHours = 10
+        int weeklyStudyHours = 10,
+        bool recordSteps = false
     ) const;
 
     // Factory methods

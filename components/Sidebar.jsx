@@ -22,7 +22,14 @@ export default function Sidebar({
   isOpen,
   onClose,
   onLogout,
+  currentUser = null,
 }) {
+  const userInitial = (currentUser?.name?.[0] || currentUser?.email?.[0] || 'S').toUpperCase();
+  const userName = currentUser?.name || 'Student Workspace';
+  const userRole = currentUser?.branch
+    ? `${currentUser.branch}${currentUser.yearOfStudy ? ` · Year ${currentUser.yearOfStudy}` : ''}`
+    : 'CS · Student';
+
   return (
     <>
       {/* Mobile overlay */}
@@ -36,12 +43,7 @@ export default function Sidebar({
         {/* Brand */}
         <div className="sidebar-brand">
           <div className="brand-icon" aria-hidden="true">
-            {/* Simple compass-style SVG wordmark */}
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <circle cx="9" cy="9" r="7.5" stroke="white" strokeWidth="1.4" />
-              <path d="M9 3.5 L10.5 9 L9 10.5 L7.5 9 Z" fill="white" opacity="0.9" />
-              <path d="M9 14.5 L7.5 9 L9 7.5 L10.5 9 Z" fill="white" opacity="0.4" />
-            </svg>
+            <img src="/pathpilot-mark.png" alt="PathPilot logo" />
           </div>
           <div>
             <div className="brand-name">PathPilot</div>
@@ -71,31 +73,38 @@ export default function Sidebar({
         </nav>
 
         {/* Profile footer */}
-        {/* Profile footer */}
-<div className="sidebar-footer">
-  <div
-    className="profile-row"
-    role="button"
-    tabIndex={0}
-    aria-label="Student profile"
-  >
-    <div className="avatar" aria-hidden="true">S</div>
+        <div className="sidebar-footer">
+          <div
+            className="profile-row"
+            role="button"
+            tabIndex={0}
+            aria-label="Student profile"
+          >
+            <div className="avatar" aria-hidden="true" style={{ background: 'var(--primary)', color: '#FFFFFF', fontWeight: 700 }}>
+              {userInitial}
+            </div>
 
-    <div>
-      <div className="profile-name">Student Workspace</div>
-      <div className="profile-role">CS · 3rd Year</div>
-    </div>
-  </div>
+            <div style={{ overflow: 'hidden' }}>
+              <div className="profile-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {userName}
+              </div>
+              <div className="profile-role" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {userRole}
+              </div>
+            </div>
+          </div>
 
-  <button
-    type="button"
-    className="sidebar-logout-btn"
-    onClick={onLogout}
-  >
-    <LogOut size={16} />
-    <span>Logout</span>
-  </button>
-</div>
+          <button
+            type="button"
+            id="sidebar-btn-logout"
+            className="sidebar-logout-btn"
+            onClick={onLogout}
+            title="Sign out of PathPilot"
+          >
+            <LogOut size={16} />
+            <span>Logout</span>
+          </button>
+        </div>
       </aside>
     </>
   );

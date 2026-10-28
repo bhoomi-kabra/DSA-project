@@ -103,9 +103,10 @@ PathPilot includes a high-performance native C++ engine (`cpp/`) that executes g
 
 1. **Algorithm A (Graph Construction)**: Validates indices, builds forward & reverse adjacency lists and in-degrees, rejects self-loops and duplicate edges.
 2. **Algorithm B (Reverse BFS Subgraph Extraction)**: Discovers prerequisite ancestors from target capstone courses.
-3. **Algorithm C (Topological Sorting)**: Implements Kahn's algorithm with deterministic tie-breaking using a min-priority queue ordered by course code.
+3. **Algorithm C (Topological Sorting & Live Inspector Tracing)**: Implements Kahn's algorithm with deterministic tie-breaking using a min-priority queue ordered by course code. Emits fine-grained micro-step traces (in-degree array updates, queue state, and popping) for the interactive **Algorithm Inspector**.
 4. **Algorithm D (Cycle Detection & Isolation)**: Detects cyclic dependencies using Kahn's algorithm and isolates cyclic nodes from blocked downstream nodes via DFS.
 5. **Algorithm E (Critical-Path Study-Time Estimation)**: Computes the longest prerequisite chain using dynamic programming along the topological order. Distinguishes total cumulative workload ($\sum h$) from critical-path duration ($\max_{\text{paths}} \sum h$).
+6. **Algorithm F (Maximum Flow & Min-Cut Cognitive Capacity Planner)**: Implements the **Edmonds-Karp algorithm** (BFS augmenting paths on residual graph $G_f$) to model student weekly cognitive study capacity. Computes the maximum schedulable course workload and isolates the **Minimum Cut edges** to mathematically pinpoint the exact saturated bottleneck constraints preventing course expansion.
 
 See [cpp/README.md](file:///c:/Users/Lenovo/OneDrive/Desktop/Path-Pilot/DSA-project/cpp/README.md) for detailed complexity analysis and architectural documentation.
 
