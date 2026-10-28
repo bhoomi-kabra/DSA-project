@@ -10,7 +10,7 @@
  *   courses   → Course library with search (My Courses)
  *   progress  → Detailed per-goal progress (My Progress)
  */
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 
 // Layout
 import Sidebar from './Sidebar';
@@ -26,6 +26,8 @@ import RoadmapView from './RoadmapView';
 import RoadmapPageView from './RoadmapPageView';
 import CoursesView from './CoursesView';
 import ProgressView from './ProgressView';
+import StudentGuideModal from './StudentGuideModal';
+import ThemeToggle from './ThemeToggle';
 
 // Data
 import { GOALS, COURSES, PROGRESS } from '../data/courseData';
@@ -43,43 +45,9 @@ import {
   Award,
   Flame,
   ChevronRight,
+  HelpCircle,
 } from 'lucide-react';
 
-// ─── Overview stats config ──────────────────────────────────
-const STAT_TILES = [
-  {
-    id: 'stat-completed',
-    icon: Award,
-    iconBg: 'rgba(82,217,164,0.12)',
-    iconColor: 'var(--success)',
-    val: PROGRESS.coursesCompleted,
-    lbl: 'Completed',
-  },
-  {
-    id: 'stat-remaining',
-    icon: BookMarked,
-    iconBg: 'rgba(139,124,255,0.12)',
-    iconColor: 'var(--accent)',
-    val: PROGRESS.coursesRemaining,
-    lbl: 'Remaining',
-  },
-  {
-    id: 'stat-hours',
-    icon: BarChart2,
-    iconBg: 'rgba(89,184,255,0.12)',
-    iconColor: 'var(--accent-2)',
-    val: `${PROGRESS.hoursLogged}h`,
-    lbl: 'Hours Logged',
-  },
-  {
-    id: 'stat-streak',
-    icon: Flame,
-    iconBg: 'rgba(245,166,35,0.12)',
-    iconColor: 'var(--warn)',
-    val: `${PROGRESS.currentStreak}d`,
-    lbl: 'Streak',
-  },
-];
 
 // ─── Page label map ─────────────────────────────────────────
 const PAGE_LABELS = {
@@ -95,18 +63,88 @@ export default function PathPilotApp() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [showGuideModal, setShowGuideModal] = useState(false);
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [theme, setTheme] = useState('dark');
+  const [userStats, setUserStats] = useState({
+    coursesCompleted: 0,
+    coursesRemaining: 44,
+    hoursLogged: 0,
+    currentStreak: 0,
+  });
+
+  // Shared state for course completion and progress
+  const [courses, setCourses] = useState(COURSES);
+
+  // Fetch real progress from database (P0-3)
+  const fetchProgress = useCallback(async () => {
+    try {
+      const res = await fetch('/api/user/progress');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.stats) {
+          setUserStats(data.stats);
+        }
+        if (data.completedCodes && Array.isArray(data.completedCodes)) {
+          const completedSet = new Set(data.completedCodes);
+          const unlockedSet = new Set(data.unlockedCodes || []);
+          setCourses((prev) =>
+            prev.map((c) => {
+              if (completedSet.has(c.code)) return { ...c, status: 'completed' };
+              if (unlockedSet.has(c.code)) return { ...c, status: 'in-progress' };
+              return { ...c, status: 'locked' };
+            })
+          );
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching student progress:', err);
+    }
+  }, []);
 
   useEffect(() => {
     setMounted(true);
     if (typeof window !== 'undefined') {
-      setIsAuthenticated(sessionStorage.getItem('pathpilot_demo_authenticated') === 'true');
-    }
-  }, []);
+      const savedTheme = localStorage.getItem('pathpilot-theme');
+      const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const initialTheme = (savedTheme === 'light' || savedTheme === 'dark') ? savedTheme : (prefersDark ? 'dark' : 'light');
+      setTheme(initialTheme);
+      document.documentElement.setAttribute('data-theme', initialTheme);
+      document.documentElement.dataset.theme = initialTheme;
 
-  // Shared state for course completion and progress
-  const [courses, setCourses] = useState(COURSES);
+      // Check session with server
+      fetch('/api/auth/me')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.authenticated && data.user) {
+            setIsAuthenticated(true);
+            setCurrentUser(data.user);
+            fetchProgress();
+          } else {
+            const hasDemoSession = sessionStorage.getItem('pathpilot_demo_authenticated') === 'true';
+            setIsAuthenticated(hasDemoSession);
+            if (hasDemoSession) fetchProgress();
+          }
+        })
+        .catch(() => {
+          setIsAuthenticated(false);
+        });
+    }
+  }, [fetchProgress]);
+
+  const handleToggleTheme = useCallback(() => {
+    setTheme((prev) => {
+      const nextTheme = prev === 'dark' ? 'light' : 'dark';
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('pathpilot-theme', nextTheme);
+        document.documentElement.setAttribute('data-theme', nextTheme);
+        document.documentElement.dataset.theme = nextTheme;
+      }
+      return nextTheme;
+    });
+  }, []);
 
   const handleCourseStatusChange = useCallback((courseId, newStatus) => {
     setCourses((previousCourses) =>
@@ -114,25 +152,68 @@ export default function PathPilotApp() {
         course.id === courseId ? { ...course, status: newStatus } : course
       )
     );
-  }, []);
+    fetchProgress();
+  }, [fetchProgress]);
 
-  const handleAuthenticated = useCallback(() => {
+  const handleAuthenticated = useCallback((user) => {
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('pathpilot_demo_authenticated', 'true');
     }
+    if (user) setCurrentUser(user);
     setIsAuthenticated(true);
-  }, []);
+    fetchProgress();
+  }, [fetchProgress]);
 
-  const handleLogout = useCallback(() => {
+  const handleLogout = useCallback(async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (e) {}
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('pathpilot_demo_authenticated');
     }
     setIsAuthenticated(false);
+    setCurrentUser(null);
     setActiveNav('overview');
     setSelectedGoal(null);
     setSearchQuery('');
     setSidebarOpen(false);
   }, []);
+
+  // Dynamic stat tiles from database (P0-3)
+  const statTiles = useMemo(() => [
+    {
+      id: 'stat-completed',
+      icon: Award,
+      iconBg: 'rgba(46, 125, 91, 0.12)',
+      iconColor: 'var(--success)',
+      val: userStats.coursesCompleted,
+      lbl: 'Completed',
+    },
+    {
+      id: 'stat-remaining',
+      icon: BookMarked,
+      iconBg: 'rgba(91, 91, 214, 0.12)',
+      iconColor: 'var(--accent)',
+      val: userStats.coursesRemaining,
+      lbl: 'Remaining',
+    },
+    {
+      id: 'stat-hours',
+      icon: BarChart2,
+      iconBg: 'rgba(37, 99, 235, 0.12)',
+      iconColor: 'var(--accent-2)',
+      val: `${userStats.hoursLogged}h`,
+      lbl: 'Hours Logged',
+    },
+    {
+      id: 'stat-streak',
+      icon: Flame,
+      iconBg: 'rgba(183, 121, 31, 0.12)',
+      iconColor: 'var(--warn)',
+      val: `${userStats.currentStreak}d`,
+      lbl: 'Streak',
+    },
+  ], [userStats]);
 
   const [targetRoadmapCourse, setTargetRoadmapCourse] = useState(null);
 
@@ -194,7 +275,13 @@ export default function PathPilotApp() {
   }
 
   if (!isAuthenticated) {
-    return <AuthPage onAuthenticated={handleAuthenticated} />;
+    return (
+      <AuthPage
+        onAuthenticated={handleAuthenticated}
+        theme={theme}
+        onToggleTheme={handleToggleTheme}
+      />
+    );
   }
 
   return (
@@ -206,6 +293,7 @@ export default function PathPilotApp() {
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         onLogout={handleLogout}
+        currentUser={currentUser}
       />
 
       {/* ── Main ────────────────────────────────────────── */}
@@ -242,15 +330,39 @@ export default function PathPilotApp() {
             />
           </div>
 
-          {/* Right — avatar */}
-          <div className="topbar-right">
+          {/* Right — avatar, Guide, & Theme toggle */}
+          <div className="topbar-right" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button
+              type="button"
+              id="topbar-btn-guide"
+              onClick={() => setShowGuideModal(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '6px 12px',
+                borderRadius: 8,
+                background: 'rgba(82, 217, 164, 0.15)',
+                border: '1px solid rgba(82, 217, 164, 0.35)',
+                color: '#52D9A4',
+                fontSize: '0.78rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <HelpCircle size={14} />
+              <span>Project Guide & How It Works</span>
+            </button>
+
+            <ThemeToggle theme={theme} onToggle={handleToggleTheme} />
+
             <div
               className="avatar"
               role="img"
               aria-label="Student avatar"
-              title="Student Workspace"
+              title={currentUser?.name || currentUser?.email || 'Student Workspace'}
             >
-              S
+              {(currentUser?.name?.[0] || currentUser?.email?.[0] || 'S').toUpperCase()}
             </div>
           </div>
         </header>
@@ -263,14 +375,14 @@ export default function PathPilotApp() {
               {/* Hero */}
               <section className="hero" aria-labelledby="hero-heading">
                 <div className="hero-content">
-                  <p className="hero-eyebrow">Personalised Learning Path Planner</p>
+                  <p className="hero-eyebrow">PLAN YOUR NEXT LEARNING STEP</p>
                   <h1 id="hero-heading" className="hero-heading">
-                    Your next skill<br />
-                    <em>starts here.</em>
+                    Learn in the right order.<br />
+                    <em>Know what comes next.</em>
                   </h1>
                   <p className="hero-sub">
-                    Build a learning path that matches your goals,
-                    one prerequisite at a time.
+                    Choose a goal to see which courses to learn first,
+                    what depends on them, and how each step connects.
                   </p>
                   <div className="hero-actions">
                     <button
@@ -280,6 +392,16 @@ export default function PathPilotApp() {
                     >
                       <GitBranch size={15} />
                       Build My Roadmap
+                    </button>
+                    <button
+                      type="button"
+                      id="hero-btn-guide"
+                      className="btn btn-outline-accent"
+                      onClick={() => setShowGuideModal(true)}
+                      style={{ gap: 6, borderColor: 'rgba(82, 217, 164, 0.4)', color: '#52D9A4' }}
+                    >
+                      <HelpCircle size={15} />
+                      Project Guide
                     </button>
                     <button
                       id="btn-browse-courses"
@@ -301,7 +423,7 @@ export default function PathPilotApp() {
                 role="list"
                 aria-label="Learning statistics"
               >
-                {STAT_TILES.map((s) => (
+                {statTiles.map((s) => (
                   <div
                     key={s.id}
                     id={s.id}
@@ -346,7 +468,7 @@ export default function PathPilotApp() {
               </section>
 
               {/* Learning Overview */}
-              <ProgressSection />
+              <ProgressSection stats={userStats} />
 
               {/* Roadmap Preview */}
               <section aria-labelledby="roadmap-preview-heading">
@@ -378,11 +500,11 @@ export default function PathPilotApp() {
                 </div>
 
                 <div className="roadmap-section">
-                  {/* C++ Engine Banner */}
-                  <div className="sample-banner" style={{ background: 'rgba(82,217,164,0.08)', borderColor: 'rgba(82,217,164,0.25)', color: '#52D9A4' }}>
-                    <Cpu size={12} aria-hidden="true" />
+                  {/* C++ Engine & DSA Innovation Banner */}
+                  <div className="sample-banner" style={{ background: 'linear-gradient(90deg, rgba(82,217,164,0.1), rgba(139,124,255,0.1))', borderColor: 'rgba(82,217,164,0.3)', color: '#52D9A4' }}>
+                    <Cpu size={13} aria-hidden="true" />
                     <span>
-                      <strong>C++ Graph Engine Integrated</strong> — Prerequisite DAGs, topological sorting, and study-time paths computed natively.
+                      <strong>C++ Graph Algorithm Engine</strong> &bull; Interactive Algorithm Inspector (Kahn&apos;s O(V+E)) &bull; Student Cognitive Capacity Planner (Edmonds-Karp Max-Flow / Min-Cut)
                     </span>
                   </div>
 
@@ -427,10 +549,16 @@ export default function PathPilotApp() {
           )}
 
           {/* ══ MY PROGRESS ══════════════════════════════ */}
-          {activeNav === 'progress' && <ProgressView courses={courses} />}
+          {activeNav === 'progress' && <ProgressView courses={courses} stats={userStats} />}
         </div>
         {/* /page-wrap */}
       </main>
+      {/* Student Guide Modal */}
+      <StudentGuideModal
+        isOpen={showGuideModal}
+        onClose={() => setShowGuideModal(false)}
+        onNavigate={(view) => navigate(view)}
+      />
     </div>
   );
 }

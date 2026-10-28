@@ -29,6 +29,7 @@ export default function AuthPage({ onAuthenticated, theme, onToggleTheme }) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const isSignup = mode === 'signup';
 
@@ -37,17 +38,17 @@ export default function AuthPage({ onAuthenticated, theme, onToggleTheme }) {
     setError('');
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
 
     if (isSignup && name.trim().length < 2) {
-      setError('Please enter your name.');
+      setError('Please enter your full name.');
       return;
     }
 
-    if (password.length < 6) {
-      setError('Your password must contain at least 6 characters.');
+    if (password.length < 8) {
+      setError('Password must contain at least 8 characters.');
       return;
     }
 
@@ -56,14 +57,57 @@ export default function AuthPage({ onAuthenticated, theme, onToggleTheme }) {
       return;
     }
 
-    // Demo mode: real credential verification requires a backend.
-    onAuthenticated?.();
+    setLoading(true);
+    try {
+      const endpoint = isSignup ? '/api/auth/register' : '/api/auth/login';
+      const payload = isSignup ? { name, email, password } : { email, password };
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setError(data.error || 'Authentication failed. Please check your credentials.');
+        return;
+      }
+
+      onAuthenticated?.(data.user);
+    } catch (err) {
+      setError('Network error communicating with authentication service.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDemoEntry = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isDemo: true }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setError(data.error || 'Failed to initialize demo session.');
+        return;
+      }
+
+      onAuthenticated?.(data.user);
+    } catch (err) {
+      setError('Network error launching demo session.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleForgotPassword = () => {
-    setError(
-      'Password reset will be available after backend integration.'
-    );
+    setError('For the DSA Competition demo, please sign in with demo@pathpilot.dev or click Quick Student Demo.');
   };
 
   return (
@@ -359,9 +403,9 @@ export default function AuthPage({ onAuthenticated, theme, onToggleTheme }) {
               </div>
             )}
 
-            <button type="submit" className="auth-submit-btn">
+            <button type="submit" className="auth-submit-btn" disabled={loading}>
               <span>
-                {isSignup ? 'Create account' : 'Sign in'}
+                {loading ? (isSignup ? 'Creating account...' : 'Signing in...') : (isSignup ? 'Create account' : 'Sign in')}
               </span>
               <ArrowRight size={18} />
             </button>
@@ -379,7 +423,8 @@ export default function AuthPage({ onAuthenticated, theme, onToggleTheme }) {
               <button
                 type="button"
                 id="btn-demo-quick-entry"
-                onClick={() => onAuthenticated?.()}
+                disabled={loading}
+                onClick={handleDemoEntry}
                 style={{
                   width: '100%',
                   padding: '12px 18px',

@@ -12,6 +12,30 @@ datasource db {
 }
 
 // =========================================================================
+// ENUMS (P1-2)
+// =========================================================================
+
+enum ProgressStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum Level {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum ResourceType {
+  VIDEO
+  COURSE
+  DOCS
+  PRACTICE
+  BOOK
+}
+
+// =========================================================================
 // USER MODEL
 // =========================================================================
 
@@ -19,12 +43,19 @@ model User {
   id               String            @id @default(uuid())
   email            String            @unique
   name             String?
+  passwordHash     String?
+  image            String?
+  yearOfStudy      Int?
+  branch           String?
+  onboarded        Boolean           @default(false)
   weeklyStudyHours Int               @default(10) // Supports time-constrained planning
   targetGoalId     String?
   createdAt        DateTime          @default(now())
 
   targetGoal       Goal?             @relation(fields: [targetGoalId], references: [id], onDelete: SetNull)
   progress         StudentProgress[]
+  studyLogs        StudyLog[]
+  savedRoadmaps    SavedRoadmap[]
 
   @@map("users")
 }
@@ -40,17 +71,17 @@ model Course {
   description    String            @db.Text
   estimatedHours Int               // Effort required for time-constrained roadmap calculation
   category       String            @default("General") // "Mathematics", "Core CS", "AI/ML", etc.
+  level          Level             @default(BEGINNER)
+  difficulty     Int               @default(1) // 1-5
   createdAt      DateTime          @default(now())
 
   // Self-referencing many-to-many relationship for DAG edges:
-  // 1. prerequisites: courses that must be completed BEFORE this course (In-Edges / Parents)
   prerequisites  Prerequisite[]    @relation("CourseAsCourse")
-
-  // 2. requiredFor: courses that this course unlocks (Out-Edges / Downstream Children)
   requiredFor    Prerequisite[]    @relation("CourseAsPrerequisite")
 
   students       StudentProgress[]
   goals          GoalCourse[]
+  resources      CourseResource[]
 
   @@index([code])
   @@map("courses")
@@ -60,13 +91,6 @@ model Course {
 // GRAPH EDGE TABLE: PREREQUISITE (Directed Edge in DAG)
 // =========================================================================
 
-// Directed Edge representing prerequisite dependency:
-// prerequisiteCourseId (Parent Node)  --->  courseId (Child Node)
-//
-// Query optimization:
-// - Forward Graph (What does course X unlock?): Query where prerequisiteCourseId = X
-// - Backward Graph (What does course Y require?): Query where courseId = Y
-// - In-degree of course Y: count of records where courseId = Y
 model Prerequisite {
   courseId             String
   prerequisiteCourseId String
@@ -85,14 +109,18 @@ model Prerequisite {
 // =========================================================================
 
 model StudentProgress {
-  id          String   @id @default(uuid())
+  id          String         @id @default(uuid())
   userId      String
   courseId    String
-  isCompleted Boolean  @default(false)
-  updatedAt   DateTime @updatedAt
+  status      ProgressStatus @default(NOT_STARTED)
+  isCompleted Boolean        @default(false) // Kept for backwards compatibility with tests and C++ bridge
+  startedAt   DateTime?
+  completedAt DateTime?
+  hoursSpent  Int            @default(0)
+  updatedAt   DateTime       @updatedAt
 
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course      Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   @@unique([userId, courseId])
   @@index([userId])
@@ -101,18 +129,79 @@ model StudentProgress {
 }
 
 // =========================================================================
+// COURSE RESOURCES (P1-3)
+// =========================================================================
+
+model CourseResource {
+  id        String       @id @default(uuid())
+  courseId  String
+  title     String
+  provider  String       // e.g. "freeCodeCamp", "MIT OCW", "YouTube"
+  url       String
+  type      ResourceType
+  isFree    Boolean      @default(true)
+  hours     Int?
+  isPrimary Boolean      @default(false)
+
+  course    Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+  @@map("course_resources")
+}
+
+// =========================================================================
+// REAL HOURS + STREAK ACTIVITY LOGS (P1-2)
+// =========================================================================
+
+model StudyLog {
+  id       String   @id @default(uuid())
+  userId   String
+  courseId String?
+  hours    Float
+  date     DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@map("study_logs")
+}
+
+// =========================================================================
+// SAVED / EXPORTED ROADMAPS (P0-4)
+// =========================================================================
+
+model SavedRoadmap {
+  id        String   @id @default(uuid())
+  userId    String
+  goalId    String
+  name      String
+  snapshot  Json     // order, nodes, edges, progress at save time
+  shareSlug String   @unique
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal      Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("saved_roadmaps")
+}
+
+// =========================================================================
 // GOAL-BASED SUBGRAPH EXTRACTION
 // =========================================================================
 
 model Goal {
-  id          String       @id @default(uuid())
-  name        String       @unique // e.g. "Machine Learning Engineer", "DSA Interview Preparation"
-  slug        String       @unique
-  description String?      @db.Text
-  createdAt   DateTime     @default(now())
+  id          String         @id @default(uuid())
+  name        String         @unique // e.g. "Machine Learning Engineer", "DSA Interview Preparation"
+  slug        String         @unique
+  description String?        @db.Text
+  icon        String?
+  color       String?
+  createdAt   DateTime       @default(now())
 
   users       User[]
   courses     GoalCourse[]
+  saved       SavedRoadmap[]
 
   @@map("goals")
 }
